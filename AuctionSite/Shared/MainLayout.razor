@@ -1,0 +1,89 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@using Microsoft.AspNetCore.SignalR.Client
+@using AuctionSite.Data
+@using AuctionSite.Helpers
+@using System.Security.Claims
+
+<PageTitle>AuctionSite</PageTitle>
+
+<MudLayout>
+    <MudAppBar Elevation="1" Color="Color.Primary">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleSide" />
+        <MudSpacer />
+        <AuctionSearchBar />
+        <MudSpacer />
+        <NotificationDisplay @ref="notifDisplay"/>
+    </MudAppBar>
+    <MudDrawer @bind-Open="@sideOpen" Elevation="1">
+        <MudDrawerHeader>
+            <LoginDisplay />
+        </MudDrawerHeader>
+        <NavMenu />
+    </MudDrawer>
+    <MudMainContent>
+        <MudContainer Style="padding-top: 20px">
+            @Body
+        </MudContainer>
+
+        <!-- MudBlazor reqs. -->
+        <MudThemeProvider />
+        <MudDialogProvider />
+        <MudSnackbarProvider />
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    bool sideOpen = false;
+
+    void ToggleSide() => sideOpen = !sideOpen;
+
+    private HubConnection? hubConnection;
+
+    private NotificationDisplay notifDisplay;
+
+    [CascadingParameter]
+    protected Task<AuthenticationState> AuthenticationStateTask { get; set; }
+
+    protected ClaimsPrincipal? CurrentUser
+    {
+        get
+        {
+            var authState = AuthenticationStateTask.Result;
+            var user = authState.User;
+            return user;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        hubConnection = new HubConnectionBuilder()
+                            .WithUrl(Navigation.ToAbsoluteUri("/BiddingHub"))
+                            .Build();
+
+        hubConnection.On<NotificationModel>("NewNotification", (newNotif) =>
+        {
+            Snackbar.Add(newNotif.Content, newNotif.Severity);
+
+            notifDisplay.PopulateNotifications(CurrentUser.GetUserID());
+
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // Notif Display is enabled if a user is logged in.
+        notifDisplay.SetEnabled(!String.IsNullOrEmpty(CurrentUser.GetUserID()));
+
+        if (notifDisplay.Enabled && firstRender)
+        {
+            notifDisplay.PopulateNotifications(CurrentUser.GetUserID());
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+}

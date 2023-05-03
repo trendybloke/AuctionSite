@@ -1,0 +1,94 @@
+﻿@using AuctionSite.Data
+@using Microsoft.EntityFrameworkCore;
+
+@if (Enabled)
+{
+	@if (Notifications != null && Notifications.Count > 0)
+	{
+		<MudToggleIconButton @bind-Toggled="@notifsOpen" Icon="@Icons.Material.Filled.NotificationImportant" ToggledIcon="@Icons.Material.Filled.CircleNotifications" Color="Color.Inherit" ToggledColor="Color.Inherit"/>
+
+		<MudPopover Open="@notifsOpen" Fixed="true" Class="pa-4 mt-4" AnchorOrigin="Origin.CenterRight" TransformOrigin="Origin.TopRight">
+			<MudText Typo="Typo.h4">Notifications</MudText>
+			<MudList Clickable="true">
+				@foreach(var notif in Notifications)
+				{
+					<MudListItem OnClick="@(() => OnNotificationClick(notif))">@notif.Content</MudListItem>
+					<MudDivider />
+				}
+			</MudList>
+		</MudPopover>
+	}
+	else
+	{
+		<MudIcon Icon="@Icons.Material.Filled.Notifications" Title="No notifications"/>
+	}
+}
+
+
+@code {
+	public bool Enabled = true;
+	bool notifsOpen = false;
+
+	[Inject]
+	NavigationManager NavigationManager { get; set; }
+
+	[Inject]
+	IDbContextFactory<ApplicationDbContext>? DbContextFactory { get; set; }
+
+	List<NotificationModel> Notifications;
+
+	//List<NotificationModel> Notifications = new List<NotificationModel>()
+	//{
+	//	new NotificationModel()
+	//	{
+	//		Content = "Notification for Test Auction A",
+	//		RedirectURL = "/auction/1",
+	//		Severity = Severity.Normal
+	//	},
+	//	new NotificationModel()
+	//	{
+	//		Content = "Notification for Test Auction B",
+	//		RedirectURL = "/auction/2",
+	//		Severity = Severity.Info
+	//	},
+	//	new NotificationModel()
+	//	{
+	//		Content = "Notification for Test Auction C",
+	//		RedirectURL = "/auction/3",
+	//		Severity = Severity.Error
+	//	},
+	//};
+
+	public void OnNotificationClick(NotificationModel notif)
+	{
+		notifsOpen = false;
+
+		Notifications.Remove(notif);
+
+		using(var context = DbContextFactory.CreateDbContext())
+		{
+			context.Notifications.Remove(notif);
+			context.SaveChanges();
+		}
+
+		NavigationManager.NavigateTo(notif.RedirectURL);
+	}
+
+	public void PopulateNotifications(string userid)
+	{
+		using(var context = DbContextFactory.CreateDbContext())
+		{
+			Notifications = context.Notifications
+										.Where(n => n.UserID == userid)
+										.ToList();
+		}
+
+		InvokeAsync(StateHasChanged);
+	}
+
+	public void SetEnabled(bool state)
+	{
+		Enabled = state;
+		InvokeAsync(StateHasChanged);
+	}
+}

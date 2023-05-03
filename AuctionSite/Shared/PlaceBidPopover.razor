@@ -1,0 +1,119 @@
+﻿@using AuctionSite.Services
+@inject BiddingService biddingService
+
+<MudOverlay @bind-Visible="Enabled" DarkBackground="true">
+	<MudPopover AnchorOrigin="Origin.CenterCenter" TransformOrigin="Origin.CenterCenter" Open="@Enabled" Class="pa-4"> 
+		<MudText Typo="Typo.subtitle1">Enter bid for "@Auction.Title"</MudText>
+		<MudText Typo="Typo.subtitle2">Entry price: £@(StartPrice)</MudText>
+		@if(!string.IsNullOrEmpty(ErrorAlert))
+		{
+			<MudAlert Severity="Severity.Error">@ErrorAlert</MudAlert>	
+		}
+		<MudNumericField T="float" @bind-Value="Amount" Min="@StartPrice" Adornment="Adornment.Start" AdornmentText="£"/>
+		<MudButton OnClick="@OnSubmit" Disabled="@showLoading">Bid</MudButton>
+		<MudButton OnClick="@(() => Enabled = false)" Disabled="@showLoading">Cancel</MudButton>
+
+		@if (showLoading)
+		{
+			<MudProgressLinear Color="Color.Secondary" Indeterminate="true" Class=""/>
+		}
+	</MudPopover>
+</MudOverlay>
+
+
+@code {
+	private bool Enabled = false;
+	private bool showLoading = true;
+
+	public AuctionModel Auction;
+	public string UserID;
+
+	public float StartPrice = 0f;
+	public float Amount;
+
+	public string ErrorAlert = "";
+
+	public event EventHandler<BidModel> OnBidSubmit;
+
+	private async void OnSubmit()
+	{
+		// UI update
+		showLoading = true;
+		StateHasChanged();
+
+		// Verify entry
+		if(Amount < 0)
+		{
+			showLoading = false;
+			ErrorAlert = "Cannot set a bid amount less than £0.00.";
+			StateHasChanged();
+			return;
+		}
+
+		if(Amount < StartPrice)
+		{
+			showLoading = false;
+			ErrorAlert = $"Bid amount must be greater than the starting price (£{StartPrice})";
+			StateHasChanged();
+			return;
+		}
+
+		// build bidmodel
+		BidModel newBid = new BidModel()
+		{
+			AuctionID = Auction.Id,
+			UserID = UserID,
+			Amount = Amount,
+			CreatedOn = DateTime.Now
+		};
+
+		await Task.Delay(3000);
+
+		// Place Bid through service
+		await biddingService.PlaceBidAsync(newBid);
+
+		// return through OnBidSubmit 
+		// -- Make sure no listeners try to do use the service --
+		if(OnBidSubmit is not null)
+		{
+			OnBidSubmit.Invoke(this, newBid);		
+		}
+
+		// close overlay
+		Enabled = false;
+		showLoading = false;
+
+		StateHasChanged();
+	}
+
+	public async void Enable(AuctionModel auction, string userID)
+	{
+		Enabled = true;
+		showLoading = true;
+		await InvokeAsync(StateHasChanged);
+
+		Auction = auction;
+		UserID = userID;
+
+		//StartPrice = startPrice;
+		//Amount = startPrice + 1;
+
+		BidModel? highestBid = await biddingService
+						.GetHighestBidAsync(auction);
+
+		if (highestBid is not null)
+		{
+			StartPrice = highestBid.Amount;
+			if (highestBid.UserID == userID)
+				ErrorAlert = "WARNING: You already have the highest bid!";
+		}
+		else
+			StartPrice = auction.StartPrice;
+
+
+		Amount = StartPrice + 1;
+
+		showLoading = false;
+		await InvokeAsync(StateHasChanged);
+	}
+}

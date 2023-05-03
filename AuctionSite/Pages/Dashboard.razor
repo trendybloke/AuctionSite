@@ -1,0 +1,233 @@
+﻿@page "/dashboard"
+@attribute [Authorize(Roles = $"{Roles.Admin},{Roles.Student}")]
+@inherits RealTimePage
+
+@inject AuctionService AuctionService
+@inject BiddingService BiddingService
+@inject WatchingService WatchingService
+
+@if(loading)
+{
+	<div class="d-flex justify-content-center" style="margin-top: 40vh">
+		<MudProgressCircular Indeterminate="true" Color="Color.Secondary" Size="Size.Large"/>
+	</div>
+}
+else
+{
+	<h3>Dashboard</h3>
+
+	<!-- Admin markup -->
+	<AuthorizeView Roles="@($"{Roles.Admin}")">
+		<!-- Auctions this user has hosted -->
+		<MudPaper Class="pa-4 ma-4" Elevation="4">
+			<MudText Typo="Typo.h4">Your Auctions</MudText>
+			@if(AdminUserAuctions.Count() == 0)
+			{
+				<MudText>You haven't started any auctions!</MudText>
+			}
+			else
+			{
+				@foreach (var auction in AdminUserAuctions)
+				{
+					<MudPaper Elevation="2" Class="pa-2">
+						<div class="d-flex">
+							@*<MudImage Src="placeholder-image.png"/>*@
+							<div>
+								<MudLink Href="@($"/auction/{auction.Id}")" Target="_blank" Typo="Typo.h5"> @auction.Title </MudLink>
+								<MudText Typo="Typo.h5">Time remaining: @AuctionTimespans[auction].GetRemainingTime()</MudText>
+							</div>
+						</div>
+					</MudPaper>
+					<br />
+				}
+			}
+		</MudPaper>
+	</AuthorizeView>
+
+	<!-- Student markup -->
+	<AuthorizeView Roles="@($"{Roles.Student}")">
+		<!-- Auctions this user has bid on -->
+		<MudPaper Class="pa-4 ma-4" Elevation="4">
+			<MudText Typo="Typo.h4">Bidded Auctions</MudText>
+			@if(StudentUserBidAuctions.Count() == 0)
+			{
+				<MudText>You haven't bid on any auctions!</MudText>
+			}
+			else
+			{
+				@foreach(var auction in StudentUserBidAuctions)
+				{
+					<MudPaper Elevation="2" Class="pa-2">
+						<div class="d-flex">
+							@*<MudImage Src="placeholder-image.png"/>*@
+							<div>
+								<MudLink Href="@($"/auction/{auction.Id}")" Target="_blank" Typo="Typo.h5"> @auction.Title </MudLink>
+								<MudText Typo="Typo.h5">Time remaining: @AuctionTimespans[auction].GetRemainingTime()</MudText>
+								<div class="d-inline-flex">
+									<MudIcon	Icon="@(WinningAuction[auction] ? winningIcon : losingIcon)" 
+												Color="@(WinningAuction[auction] ? Color.Success : Color.Warning)" 
+												Class="mt-1"
+									/>
+									<MudText Typo="Typo.h6">
+										@(WinningAuction[auction] ? "Currently winning" : "Currently outbid")
+									</MudText>
+								</div>
+							</div>
+						</div>
+					</MudPaper>
+					<br />
+				}
+			}
+		</MudPaper>
+
+		<!-- Auctions user is watching -->
+		<MudPaper Class="pa-4 ma-4" Elevation="4">
+			<MudText Typo="Typo.h4">Watched Auctions</MudText>
+			@if(StudentUserWatchedAuctions.Count() == 0)
+			{
+				<MudText>You aren't watching any auctions!</MudText>
+			}
+			else
+			{
+				@foreach (var auction in StudentUserWatchedAuctions)
+				{
+					<MudPaper Elevation="2" Class="pa-2">
+						<div class="d-flex">
+							@*<MudImage Src="placeholder-image.png"/>*@
+							<div>
+								<MudLink Href="@($"/auction/{auction.Id}")" Target="_blank" Typo="Typo.h5"> @auction.Title </MudLink>
+								<MudText Typo="Typo.h5">Time remaining: @AuctionTimespans[auction].GetRemainingTime()</MudText>
+							</div>
+						</div>
+					</MudPaper>
+					<br />
+				}
+			}
+		</MudPaper>
+
+		<!-- Auctions user has won -->
+		<MudPaper Class="pa-4 ma-4" Elevation="4">
+			<MudText Typo="Typo.h4">Won auctions</MudText>
+			@if (StudentUserWonAuctions.Count() == 0)
+			{
+				<MudText>You haven't won any auctions (yet!)</MudText>
+			}
+			else
+			{
+				@foreach (var auction in StudentUserWonAuctions)
+				{
+					<MudPaper Elevation="2" Class="pa-2">
+						<div class="d-flex">
+							@*<MudImage Src="placeholder-image.png"/>*@
+							<div>
+								<MudLink Href="@($"/auction/{auction.Id}")" Target="_blank" Typo="Typo.h5"> @auction.Title </MudLink>
+								<MudText Typo="Typo.h6">@($"Auction closed on {auction.EndDate}")</MudText>
+							</div>
+						</div>
+					</MudPaper>
+					<br />
+				}
+			}
+		</MudPaper>
+	</AuthorizeView>	
+}
+
+
+@code {
+	bool loading = true;
+
+	AuctionModel[] AdminUserAuctions;
+	AuctionModel[] StudentUserWatchedAuctions;
+
+	List<AuctionModel> StudentUserBidAuctions;
+	List<AuctionModel> StudentUserWonAuctions;
+
+	Dictionary<AuctionModel, TimeSpan> AuctionTimespans;
+	Dictionary<AuctionModel, bool> WinningAuction;
+
+	private const string winningIcon = Icons.Material.Filled.CheckCircleOutline;
+	private const string losingIcon = Icons.Material.Outlined.Info;
+
+	protected async override Task OnInitializedAsync()
+	{
+		await base.OnInitializedAsync();
+
+		AuctionTimespans = new Dictionary<AuctionModel, TimeSpan>();
+
+		// If Admin, get auctions user has made
+		if (CurrentUser.IsAdmin())
+		{
+			await PopulateAdminAuctionLists();
+		}
+
+
+		// If Student, get bidded and watched auctions
+		if (CurrentUser.IsStudent())
+		{
+			StudentUserBidAuctions = new List<AuctionModel>();
+			StudentUserWonAuctions = new List<AuctionModel>();
+			// Watched Auctions are found via WatchingService
+			WinningAuction = new Dictionary<AuctionModel, bool>();
+
+			await PopulateStudentAuctionLists();
+		}
+
+		// Page has loaded
+		loading = false;
+		await InvokeAsync(StateHasChanged);
+	}
+
+	private async Task PopulateStudentAuctionLists()
+	{
+		// Bids - both current and won
+		var userBids = await BiddingService.GetBidHistoryAsync(CurrentUser.GetUserID());
+
+		foreach(var bid in userBids)
+		{
+			if(!StudentUserBidAuctions.Any(a => a.Id == bid.AuctionID))
+			{
+				var auction = await BiddingService.GetAuctionFromBidAsync(bid);
+
+				AuctionTimespans.TryAdd(auction, auction.EndDate - DateTime.Now);
+
+				WinningAuction.TryAdd(auction, false);
+
+				if (!WinningAuction[auction])
+					WinningAuction[auction] = BiddingService.GetHighestBid(auction).Amount == bid.Amount;
+
+				if(auction.State == Enums.AuctionState.Open)
+					StudentUserBidAuctions.Add(auction);
+				else
+				{
+					if (WinningAuction[auction])
+						StudentUserWonAuctions.Add(auction);
+				}
+			}
+		}
+
+		// Watching auctions
+		StudentUserWatchedAuctions = await WatchingService.GetWatchedAuctionsAsync(CurrentUser.GetUserID());
+		foreach (var auction in StudentUserWatchedAuctions)
+			AuctionTimespans.TryAdd(auction, auction.EndDate - DateTime.Now);
+	}
+
+	private async Task PopulateAdminAuctionLists()
+	{
+		AdminUserAuctions = await AuctionService.GetAuctionsByAdmin(CurrentUser.GetUserID());
+		foreach(var auction in AdminUserAuctions)
+			AuctionTimespans.TryAdd(auction, auction.EndDate - DateTime.Now);
+	}
+
+	protected override void TimerTick(object stateInfo)
+	{
+		if (!loading)
+		{
+			foreach(var key in AuctionTimespans.Keys)
+			{
+				AuctionTimespans[key] = AuctionTimespans[key].Subtract(TimeSpan.FromSeconds(1));
+			}
+		}
+
+		base.TimerTick(stateInfo);
+	}
+}

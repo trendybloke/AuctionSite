@@ -1,0 +1,188 @@
+﻿@page "/auctions"
+@*@inherits PageBase*@
+@inherits RealTimePage
+@using AuctionSite.Helpers
+
+@if(!string.IsNullOrEmpty(query))
+{
+	<MudText Typo="Typo.h3"> Searching for "@query"... </MudText>
+	<br />
+	@if (Querying || QueryResults is null)
+	{
+		<MudProgressCircular Indeterminate="true" />
+	}
+	else
+	{
+		@if(QueryResults.Count == 0)
+		{
+			<MudText Typo="Typo.h4">Nothing found!</MudText>
+		}
+		else
+		{
+			<MudText Typo="Typo.h4">@QueryResults.Count result(s)</MudText>
+		}
+
+		<div class="d-flex flex-row align-center">
+
+			<MudSelect Label="Results per page" @bind-Value="resultsPerPage">
+				<MudSelectItem Value="1">1</MudSelectItem>
+				<MudSelectItem Value="2">2</MudSelectItem>
+				<MudSelectItem Value="5">5</MudSelectItem>
+				<MudSelectItem Value="10">10</MudSelectItem>
+			</MudSelect>
+
+			<MudSpacer />
+
+			<MudSelect Label="Item Condition" @bind-Value="conditionFilter">
+				@foreach(ConditionFilter filter in Enum.GetValues(typeof(ConditionFilter)))
+				{
+					<MudSelectItem Value="@filter">@filter</MudSelectItem>
+				}
+			</MudSelect>
+
+			<MudSpacer/>
+
+			<MudNumericField	@bind-Value="minimumPrice" 
+								Label="Minimum price" 
+								Variant="Variant.Text" 
+								Step=".1f"
+								HideSpinButtons="true"
+								Min="0.0f" 
+								Max="@maximumPrice"
+								Culture="System.Globalization.CultureInfo.CurrentCulture"
+								Adornment="Adornment.Start"
+								AdornmentText="£" />
+
+			<MudSpacer />
+
+			<MudNumericField	@bind-Value="maximumPrice" 
+								Label="Maximum price" 
+								Variant="Variant.Text" 
+								Step=".1f"
+								HideSpinButtons="true"
+								Min="@minimumPrice"
+								Culture="System.Globalization.CultureInfo.CurrentCulture"
+								Adornment="Adornment.Start"
+								AdornmentText="£"/>
+		</div>
+
+		<br/>
+
+		@if(QueryResults.Count > 0)
+		{
+			<div class="d-flex flex-column align-center">
+				<MudPagination Color="Color.Primary" Count="@((QueryResults.Count - 1) / resultsPerPage + 1)" @bind-Selected="@selectedPage" />
+			</div>
+
+			foreach(var result in PageResults)
+			{
+				<MudPaper Elevation="2">
+					<div class="d-flex">
+						<MudImage Src="placeholder-image.png"/>
+						<div>
+							<MudLink Href="@($"/auction/{result.Id}")" Target="_blank" Typo="Typo.h5"> @result.Title </MudLink>
+							<MudText Typo="Typo.h5">Time remaining: @PageResultTimeSpans[result.Id].GetRemainingTime()</MudText>
+							<MudText Typo="Typo.h6">Starting at £@result.StartPrice</MudText>
+							<MudText Typo="Typo.h6">Condition: @result.Condition</MudText>
+							<MudText>@result.Description</MudText>
+						</div>
+					</div>
+				</MudPaper>
+				<br />
+			}
+
+			<div class="d-flex flex-column align-center">
+				<MudPagination Color="Color.Primary" Count="@((QueryResults.Count - 1) / resultsPerPage + 1)" @bind-Selected="@selectedPage"/>
+			</div>
+		}
+	}
+}
+
+
+@code {
+	[Parameter]
+	[SupplyParameterFromQuery]
+	public string? query { get; set; }
+
+	public List<AuctionModel> FoundAuctions;
+	public List<AuctionModel> QueryResults;
+	public List<AuctionModel> PageResults;
+
+	public Dictionary<int, TimeSpan> PageResultTimeSpans;
+
+	public bool Querying = true;
+
+	private int selectedPage = 1;
+	private int resultsPerPage = 5;
+
+	public enum ConditionFilter { Any, New, Used, Average, Poor }
+	private ConditionFilter conditionFilter = ConditionFilter.Any;
+
+	private float minimumPrice = 0.00f;
+	private float maximumPrice = 10000.00f;
+
+	protected override async void TimerTick(object? stateInfo)
+	{
+		foreach(var result in PageResults)
+		{
+			try
+			{
+				PageResultTimeSpans[result.Id] = PageResultTimeSpans[result.Id].Subtract(TimeSpan.FromSeconds(1));
+			}
+			catch (Exception Ex)
+			{
+				Snackbar.Add(Ex.Message, Severity.Error);
+			}
+		}
+
+		base.TimerTick(stateInfo);
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		await base.OnAfterRenderAsync(firstRender);
+
+		if (string.IsNullOrEmpty(query))
+			return;
+
+		if (firstRender)
+		{
+			using (var context = DbContextFactory.CreateDbContext())
+			{
+				FoundAuctions = context.Auctions
+										.AsEnumerable()
+										.ToList();
+
+				Querying = false;
+			}
+
+			PageResultTimeSpans = new Dictionary<int, TimeSpan>();
+		}
+
+		QueryResults = FoundAuctions
+							.Where(a => a.Title.Contains(query, StringComparison.InvariantCultureIgnoreCase))
+							.Where(a => a.StartPrice >= minimumPrice && a.StartPrice <= maximumPrice)
+							.ToList();
+
+		if(conditionFilter != ConditionFilter.Any)
+		{
+			QueryResults = QueryResults
+								.Where(a => a.Condition.ToString() == conditionFilter.ToString())
+								.ToList();
+		}
+
+		PageResults = QueryResults
+							.Skip(resultsPerPage * (selectedPage - 1))
+							.Take(resultsPerPage)
+							.ToList();
+
+		PageResultTimeSpans.Clear();
+
+		foreach(var result in PageResults)
+		{
+			PageResultTimeSpans.TryAdd(result.Id, result.EndDate - DateTime.Now);
+		}
+
+		await InvokeAsync(StateHasChanged);
+	}
+}

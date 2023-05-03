@@ -1,0 +1,51 @@
+﻿@using AuctionSite.Data
+@inject NavigationManager NavigationManager
+
+<MudItem xs="12" sm="6" md="4">
+	<MudTextField	@ref="SearchField"
+					T="string"
+					Label="Search for auctions..."
+					Variant="Variant.Filled"
+					@bind-Value="SearchTerm"
+					TextChanged="OnSearchChange"
+					Immediate="true"
+					Clearable="true"
+					Adornment="Adornment.End"
+					AdornmentIcon="@Icons.Material.Filled.Search"
+					/>
+</MudItem>
+
+@code {
+	public MudTextField<string>? SearchField { get; set; }
+	public string SearchTerm { get; set; }
+
+	public bool UserSearching { get; set; } = false;
+	public string RedirectURL { get; set; } = "/";
+
+	public string GetSearchURL(string searchTerm)
+	{
+		return $"/auctions?query={searchTerm}";
+		// ?redirect={NavigationManager.Uri} -- Issue with this being here is that this will be overwritten past the first character.
+		// ?redirect={RedirectURL} -- Better solution, but the page has to parse this out, and this component is already tracking where to redirect.
+	}
+
+	public void OnSearchChange()
+	{
+		if (!UserSearching)
+		{
+			RedirectURL = NavigationManager.Uri;
+			UserSearching = true;
+		}
+
+		if (string.IsNullOrEmpty(SearchTerm))
+		{
+			NavigationManager.NavigateTo(RedirectURL);
+			UserSearching = false;
+			return;
+		}
+
+		NavigationManager.NavigateTo(GetSearchURL(SearchTerm));
+	}
+
+
+}

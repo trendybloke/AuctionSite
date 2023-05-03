@@ -1,0 +1,169 @@
+﻿@page "/auction/{Id:int}"
+@inherits RealTimePage
+@using AuctionSite.Enums
+@using AuctionSite.Helpers
+@using AuctionSite.Services
+@using System.Text
+@using System.Globalization
+
+@inject BiddingService BiddingService
+@inject WatchingService WatchingService
+
+@if(auction == null)
+{
+	<p><em>Loading...</em></p>
+}
+else
+{
+	<PlaceBidPopover @ref="BidPopover" />
+
+	<div class="d-flex flex-md-row flex-column flex-grow-1 gap-2">
+		<div class="">
+			<MudPaper Elevation="4" Class="px-4 mx-4">
+				<MudText Typo="Typo.h3">@auction.Title</MudText>
+				<MudText Typo="Typo.h5">Starting price: £@auction.StartPrice</MudText>
+				<MudText Typo="Typo.h6">
+					@(
+						BiddingService.GetHighestBid(auction) is null ?
+						"" :
+						$"Current price: {BiddingService.GetHighestBid(auction).Amount.ToString("C", CultureInfo.CurrentCulture)}"
+						)
+				</MudText>
+				<MudText Typo="Typo.h5">Condition: @auction.Condition</MudText>
+				<MudText Typo="Typo.h6">Auction started on @auction.StartDate</MudText>
+				<MudCarousel TData="object">
+					<MudCarouselItem Transition="Transition.Fade" Class="d-flex justify-center align-center" Style="height:500px">
+						@*<MudImage Src="placeholder-image.png" Fluid="true" ObjectFit="ObjectFit.Cover"/>*@
+						<img src="placeholder-image.png" width="500" height="500">
+					</MudCarouselItem>
+				</MudCarousel>
+				<MudText Typo="Typo.h6">Description</MudText>
+				<MudText Typo="Typo.body1">@auction.Description</MudText>
+				<br/>
+				<MudText Typo="Typo.h6">@auctionStateText</MudText>
+				@if (auctionOpen)
+				{
+					<MudText Typo="Typo.h5">Auction closes in @timeTillClosed.GetRemainingTime()</MudText>
+				}
+				@if (!CurrentUser.IsAdmin())
+				{
+					<MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => OnBid())" Disabled="@(!auctionOpen)">Bid</MudButton>
+				}
+				<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => OnWatch())" Disabled="@(!auctionOpen)">Watch</MudButton>
+			</MudPaper>
+		</div>
+		<MudSpacer/>
+		<div class="">
+			<MudPaper Elevation="4" Class="px-4 mx-4">
+				<MudText Typo="Typo.h4">Bid history</MudText>
+				@if(bids is null || bids.Count() == 0)
+				{
+					<MudText Typo="Typo.h6">No bids have been placed!</MudText>
+				}
+				else
+				{
+					<MudDataGrid Items="bids" FixedHeader="true" Height="400px">
+						<Columns>
+							<PropertyColumn Property="b => b.CreatedOn" Title="Placed on" />
+							<PropertyColumn Property="@(b => b.Amount.ToString("C", CultureInfo.CurrentCulture))" Title="Amount" />
+						</Columns>
+					</MudDataGrid>
+				}
+			</MudPaper>
+		</div>
+	</div>
+}
+
+
+@code {
+	AuctionModel? auction;
+
+	BidModel[]? bids;
+
+	TimeSpan timeTillClosed;
+
+	PlaceBidPopover BidPopover;
+
+	bool auctionOpen => auction.State == AuctionState.Open;
+
+	string auctionStateText => auctionOpen
+								? $"Auction is currently open until {auction.EndDate}"
+								: $"Auction closed on {auction.EndDate}";
+
+	[Parameter]
+	public int? Id { get; set; }
+
+	protected async override Task OnInitializedAsync()
+	{
+		await base.OnInitializedAsync();
+
+		// refactor?
+		using(var context = await DbContextFactory.CreateDbContextAsync())
+		{
+			auction = context
+						.Auctions
+						.Where(a => a.Id == Id)
+						.SingleOrDefault();
+		}
+
+		if (auctionOpen)
+		{
+			timeTillClosed = auction.EndDate - DateTime.Now;		
+		}
+
+		bids = await BiddingService.GetBidHistoryAsync(auction);
+
+		await InvokeAsync(StateHasChanged);
+	}
+
+	protected override void OnAfterRender(bool firstRender)
+	{
+		base.OnAfterRender(firstRender);
+
+		BidPopover.OnBidSubmit += OnBidSubmit;
+	}
+
+	protected async override void TimerTick(object? stateInfo)
+	{
+		timeTillClosed = timeTillClosed.Subtract(TimeSpan.FromSeconds(1));
+
+		base.TimerTick(stateInfo);
+	}
+
+	void OnBid()
+	{
+		BidPopover.Enable(auction, CurrentUser.GetUserID());
+	}
+
+	void OnBidSubmit(object sender, BidModel bid)
+	{
+		var bidHist = BiddingService.GetBidHistory(auction).ToList();
+
+		//bidHist.Add(bid);
+
+		bids = bidHist.OrderByDescending(b => b.Amount).ToArray();
+
+		StateHasChanged();
+	}
+
+	async void OnWatch()
+	{
+		WatchModel watchModel = new WatchModel()
+		{
+			WatchingUserID = CurrentUser.GetUserID(),
+			AuctionID = auction.Id
+		};
+
+		var watchResult = await WatchingService.StartWatchingAuctionAsync(watchModel);
+
+		if (watchResult)
+		{
+			Snackbar.Add($"Now watching {auction.Title}", Severity.Info);
+		}
+		else
+		{
+			Snackbar.Add($"Couldn't watch / unwatch {auction.Title} because Josh needs to put that in!", Severity.Error);
+		}
+
+	}
+}

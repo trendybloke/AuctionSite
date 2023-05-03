@@ -1,0 +1,209 @@
+﻿@page "/"
+@inherits RealTimePage
+
+@inject BiddingService BiddingService
+@inject WatchingService WatchingService
+
+@using AuctionSite.Enums
+@using AuctionSite.Helpers
+@using AuctionSite.Services
+@using System.Text
+@using System.Globalization
+@using Microsoft.AspNetCore.SignalR.Client;
+
+<PageTitle>Home</PageTitle>
+
+@*<MudText Typo="Typo.h1">Auction Site</MudText>*@
+
+@*<AuthorizeView Roles="@($"{Roles.Student}")">
+	<MudText Typo="Typo.h2">Student dashboard</MudText>
+</AuthorizeView>
+
+<AuthorizeView Roles="@($"{Roles.Admin}")">
+	<MudText Typo="Typo.h2">Admin Dashboard</MudText>
+</AuthorizeView>*@
+
+<MudText Typo="Typo.h2">Home</MudText>
+
+<PlaceBidPopover @ref="BidPopover" />
+
+@if(Auctions == null)
+{
+	<MudText>Loading auctions...</MudText>
+	<MudProgressCircular Color="Color.Primary" Size="Size.Medium" Indeterminate="true"/>
+}
+else
+{
+	<MudText Typo="Typo.h4">New Auctions</MudText>
+	<MudCarousel Class="mud-width-full" Style="height: 500px" ItemsSource="@RecentAuctions">
+		<ItemTemplate>
+			<div class="d-flex" style="height:100%; padding-top:15px;">
+				<MudImage Src="placeholder-image.png"/>
+				<div>
+					@*<MudText Typo="Typo.h4">@context.Title</MudText>*@
+					<MudLink Href="@($"/auction/{context.Id}")" Typo="Typo.h4">@context.Title</MudLink>
+					<MudText Typo="Typo.h5">@AuctionTimeRemainings[context.Id]</MudText>
+					<MudText Typo="Typo.h6">@($"Starting price: {context.StartPrice.ToString("C", CultureInfo.CurrentCulture)}")</MudText>
+					@*<MudText Typo="Typo.h6">@($"Current price: {BiddingService.GetHighestBidAsync(context).Result.Amount}")</MudText>*@
+						<MudText Typo="Typo.h6">
+							@(
+								BiddingService.GetHighestBid(context) is null ? 
+								"" : 
+								$"Current price: {BiddingService.GetHighestBid(context).Amount.ToString("C", CultureInfo.CurrentCulture)}"
+							)
+						</MudText>
+					<MudText Typo="Typo.h6">@($"Condition: {context.Condition}")</MudText>
+					<MudText>@context.Description</MudText>
+				</div>
+			</div>
+		</ItemTemplate>
+	</MudCarousel>
+
+	<MudText Typo="Typo.h4">Brand new items</MudText>
+	<div class="d-inline-flex pa-2" style="width: 100vw;">
+	@foreach(var auction in NewAuctions)
+	{
+			<MudCard Style="width: 30%">
+				<MudCardHeader>
+					<MudText Typo="Typo.h5">@auction.Title</MudText>
+				</MudCardHeader>
+				<MudCardMedia Image="placeholder-image.png" Height="200"/>
+				<MudCardContent>
+					<MudText Typo="Typo.h5">Closes in @AuctionTimeRemainings[auction.Id] </MudText>
+					<MudText Typo="Typo.h6">@($"Starting price: {auction.StartPrice.ToString("C", CultureInfo.CurrentCulture)}")</MudText>
+					<MudText Typo="Typo.h6">
+						@(
+							BiddingService.GetHighestBid(auction) is null ?
+							"" :
+							$"Current price: {BiddingService.GetHighestBid(auction).Amount.ToString("C", CultureInfo.CurrentCulture)}"
+						)
+					</MudText>
+					@*<MudText>@auction.Description</MudText>*@
+				</MudCardContent>
+				<MudCardActions>
+					<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => WatchAuction(auction))">Watch</MudButton>
+					<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => ViewAuction(auction))">View</MudButton>
+					<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => BidPopover.Enable(auction, CurrentUser.GetUserID()))">Bid</MudButton>
+				</MudCardActions>
+			</MudCard>			
+	}
+	</div>
+}
+
+@code {
+	private MudCarousel<AuctionModel> _carousel;
+	private PlaceBidPopover BidPopover;
+
+	AuctionModel[]? Auctions;
+	Dictionary<int, TimeSpan> AuctionTimespans;
+	Dictionary<int, string> AuctionTimeRemainings;
+
+	AuctionModel[]? RecentAuctions;
+	AuctionModel[]? NewAuctions;
+
+	private HubConnection? bidHubConnection;
+
+	int selectedCarouselItem;
+
+	protected async override Task OnInitializedAsync()
+	{
+		await base.OnInitializedAsync();
+
+		// AuctionModel collection initializations
+		using(var context = await DbContextFactory.CreateDbContextAsync())
+		{
+			Auctions = context.Auctions.ToArray();
+		}
+
+		RecentAuctions = Auctions
+						.OrderByDescending(a => a.StartDate)
+						.Take(5).
+						ToArray();
+
+		NewAuctions = RecentAuctions
+						.Where(a => a.Condition == ItemCondition.New)
+						.Take(5)
+						.ToArray();
+
+		// AuctionTimespans initialization
+		AuctionTimespans = new Dictionary<int, TimeSpan>();
+		AuctionTimeRemainings = new Dictionary<int, string>();
+
+		foreach(var auction in Auctions)
+		{
+			AuctionTimespans.Add(auction.Id, auction.EndDate - DateTime.Now);
+			//AuctionTimeRemainings.Add(auction.Id, GetRemainingTime(AuctionTimespans[auction.Id]));
+			AuctionTimeRemainings.Add(auction.Id, AuctionTimespans[auction.Id].GetRemainingTime());
+		}
+
+		// Init. hub connection
+		bidHubConnection = new HubConnectionBuilder()
+									.WithUrl(NavigationManager.ToAbsoluteUri("/BiddingHub"))
+									.Build();
+
+		await bidHubConnection.StartAsync();
+
+		await InvokeAsync(StateHasChanged);
+	}
+
+	protected override void OnAfterRender(bool firstRender)
+	{
+		// PlaceBidPopover event handler
+		BidPopover.OnBidSubmit += PlaceBid;
+	}
+
+	protected override void TimerTick(object? stateInfo)
+	{
+		AutoResetEvent? autoEvent = (AutoResetEvent?)stateInfo;
+
+		// update elapsed time for each auction
+		foreach (var auction in Auctions)
+		//for(int i = 0; i < AuctionTimespans.Count; i++)
+		{
+			AuctionTimespans[auction.Id] = AuctionTimespans[auction.Id].Subtract(TimeSpan.FromSeconds(1));
+			//AuctionTimeRemainings[auction.Id] = GetRemainingTime(AuctionTimespans[auction.Id]);
+			AuctionTimeRemainings[auction.Id] = AuctionTimespans[auction.Id].GetRemainingTime();
+		}
+
+		base.TimerTick(stateInfo);
+	}
+
+	private async void WatchAuction(AuctionModel auction)
+	{
+		WatchModel watchModel = new WatchModel()
+		{
+			WatchingUserID = CurrentUser.GetUserID(),
+			AuctionID = auction.Id
+		};
+
+		var watchResult = await WatchingService.StartWatchingAuctionAsync(watchModel);
+
+		if (watchResult)
+		{
+			Snackbar.Add($"Watching {auction.Title}", Severity.Success);		
+		}
+		else
+		{
+			Snackbar.Add($"Failed to watch {auction.Title}", Severity.Error);
+		}
+
+	}
+
+	private void ViewAuction(AuctionModel auction)
+	{
+		//Snackbar.Add($"Redirect to {auction.Title}", Severity.Info);
+		NavigationManager.NavigateTo($"/auction/{auction.Id}");
+	}
+
+	private async void PlaceBid(object sender, BidModel newBid)
+	{
+		//Snackbar.Add($"New bid of {newBid.Amount} found!");
+		if(bidHubConnection is null || bidHubConnection.State == HubConnectionState.Disconnected)
+		{
+			Snackbar.Add("Can't connect to server: bid not placed", Severity.Error);
+			return;
+		}
+
+		await bidHubConnection.SendAsync("PlaceBid", newBid);
+	}
+}
