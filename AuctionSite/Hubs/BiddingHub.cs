@@ -18,6 +18,9 @@ namespace AuctionSite.Hubs
 
 		[Inject]
 		public WatchingService WatchingService { get; set; }
+		
+		[Inject]
+		public NotificationService NotificationService { get; set; }
 
 		//public BiddingHub(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 		//{
@@ -40,7 +43,7 @@ namespace AuctionSite.Hubs
 			string[] watchingUserIds = await WatchingService.GetUsersWatchingAuctionAsync(biddedAuction);
 
 			//foreach(string userid in biddedAuction.WatchingUserIDs)
-			foreach(string userid in watchingUserIds)
+			foreach(string userid in watchingUserIds)		// Possible refactor?
 			{
 				// Notify user
 				NotificationModel newNotif = new NotificationModel()
@@ -52,6 +55,8 @@ namespace AuctionSite.Hubs
 				};
 
 				await Clients.User(userid).SendAsync("NewNotification", newNotif);
+				
+				await NotificationService.PersistNotificationAsync(newNotif);
 			}
 
 			// Get all watching users
