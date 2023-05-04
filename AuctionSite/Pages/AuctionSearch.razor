@@ -1,6 +1,9 @@
 ﻿@page "/auctions"
 @*@inherits PageBase*@
 @inherits RealTimePage
+
+@inject AuctionService AuctionService
+
 @using AuctionSite.Helpers
 
 @if(!string.IsNullOrEmpty(query))
@@ -147,14 +150,18 @@
 
 		if (firstRender)
 		{
-			using (var context = DbContextFactory.CreateDbContext())
-			{
-				FoundAuctions = context.Auctions
-										.AsEnumerable()
-										.ToList();
+			//using (var context = DbContextFactory.CreateDbContext())
+			//{
+			//	FoundAuctions = context.Auctions
+			//							.AsEnumerable()
+			//							.ToList();
 
-				Querying = false;
-			}
+			//	Querying = false;
+			//}
+
+			var auctions = await AuctionService.GetAuctionsAsync();
+
+			FoundAuctions = auctions.ToList();
 
 			PageResultTimeSpans = new Dictionary<int, TimeSpan>();
 		}

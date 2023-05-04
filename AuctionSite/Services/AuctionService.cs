@@ -14,7 +14,31 @@ namespace AuctionSite.Services
 			DbContextFactory = dbContextFactory;
 		}
 
-		public async Task<AuctionModel[]> GetAuctionsByAdmin(string adminUserId)
+		public async Task<AuctionModel?> GetAuctionAsync(int? id)
+		{
+			AuctionModel? auction;
+
+			using(var context = await DbContextFactory.CreateDbContextAsync())
+			{
+				auction = await context.Auctions.FindAsync(id);
+			}
+
+			return auction;
+		}
+
+		public async Task<AuctionModel[]> GetAuctionsAsync()
+		{
+			AuctionModel[] auctions;
+
+			using(var context = await DbContextFactory.CreateDbContextAsync())
+			{
+				auctions = context.Auctions.ToArray();
+			}
+
+			return auctions;
+		}
+
+		public async Task<AuctionModel[]> GetAuctionsByAdminAsync(string adminUserId)
 		{
 			AuctionModel[] adminAuctions;
 

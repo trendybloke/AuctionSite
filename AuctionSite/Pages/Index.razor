@@ -1,6 +1,7 @@
 ﻿@page "/"
 @inherits RealTimePage
 
+@inject AuctionService AuctionService
 @inject BiddingService BiddingService
 @inject WatchingService WatchingService
 
@@ -12,17 +13,6 @@
 @using Microsoft.AspNetCore.SignalR.Client;
 
 <PageTitle>Home</PageTitle>
-
-@*<MudText Typo="Typo.h1">Auction Site</MudText>*@
-
-@*<AuthorizeView Roles="@($"{Roles.Student}")">
-	<MudText Typo="Typo.h2">Student dashboard</MudText>
-</AuthorizeView>
-
-<AuthorizeView Roles="@($"{Roles.Admin}")">
-	<MudText Typo="Typo.h2">Admin Dashboard</MudText>
-</AuthorizeView>*@
-
 <MudText Typo="Typo.h2">Home</MudText>
 
 <PlaceBidPopover @ref="BidPopover" />
@@ -81,9 +71,11 @@ else
 					@*<MudText>@auction.Description</MudText>*@
 				</MudCardContent>
 				<MudCardActions>
-					<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => WatchAuction(auction))">Watch</MudButton>
 					<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => ViewAuction(auction))">View</MudButton>
-					<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => BidPopover.Enable(auction, CurrentUser.GetUserID()))">Bid</MudButton>
+					<AuthorizeView Roles="@($"{Roles.Student}")">
+						<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => WatchAuction(auction))">Watch</MudButton>
+						<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => BidPopover.Enable(auction, CurrentUser.GetUserID()))">Bid</MudButton>
+					</AuthorizeView>
 				</MudCardActions>
 			</MudCard>			
 	}
@@ -110,10 +102,12 @@ else
 		await base.OnInitializedAsync();
 
 		// AuctionModel collection initializations
-		using(var context = await DbContextFactory.CreateDbContextAsync())
-		{
-			Auctions = context.Auctions.ToArray();
-		}
+		//using(var context = await DbContextFactory.CreateDbContextAsync())
+		//{
+		//	Auctions = context.Auctions.ToArray();
+		//}
+
+		Auctions = await AuctionService.GetAuctionsAsync();
 
 		RecentAuctions = Auctions
 						.OrderByDescending(a => a.StartDate)

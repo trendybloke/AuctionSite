@@ -213,7 +213,7 @@ else
 
 	private async Task PopulateAdminAuctionLists()
 	{
-		AdminUserAuctions = await AuctionService.GetAuctionsByAdmin(CurrentUser.GetUserID());
+		AdminUserAuctions = await AuctionService.GetAuctionsByAdminAsync(CurrentUser.GetUserID());
 		foreach(var auction in AdminUserAuctions)
 			AuctionTimespans.TryAdd(auction, auction.EndDate - DateTime.Now);
 	}

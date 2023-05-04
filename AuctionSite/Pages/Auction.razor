@@ -6,6 +6,7 @@
 @using System.Text
 @using System.Globalization
 
+@inject AuctionService AuctionService
 @inject BiddingService BiddingService
 @inject WatchingService WatchingService
 
@@ -98,13 +99,15 @@ else
 		await base.OnInitializedAsync();
 
 		// refactor?
-		using(var context = await DbContextFactory.CreateDbContextAsync())
-		{
-			auction = context
-						.Auctions
-						.Where(a => a.Id == Id)
-						.SingleOrDefault();
-		}
+		//using(var context = await DbContextFactory.CreateDbContextAsync())
+		//{
+		//	auction = context
+		//				.Auctions
+		//				.Where(a => a.Id == Id)
+		//				.SingleOrDefault();
+		//}
+
+		auction = await AuctionService.GetAuctionAsync(Id);
 
 		if (auctionOpen)
 		{
