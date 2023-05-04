@@ -16,14 +16,18 @@ namespace AuctionSite.Hubs
 		[Inject]
 		public BiddingService BiddingService { get; set; }
 
+		[Inject]
+		public WatchingService WatchingService { get; set; }
+
 		//public BiddingHub(IDbContextFactory<ApplicationDbContext> dbContextFactory)
 		//{
 		//	this.DbContextFactory = dbContextFactory;
 		//}
 
-		public BiddingHub(BiddingService biddingService)
+		public BiddingHub(BiddingService biddingService, WatchingService watchingService)
 		{
 			BiddingService = biddingService;
+			WatchingService = watchingService;
 		}
 
 		public async Task BidPlaced(BidModel bid)
@@ -33,19 +37,22 @@ namespace AuctionSite.Hubs
 			string notifContent = $"Someone placed a bid for {biddedAuction.Title}";
 			Severity notifSeverity = Severity.Info;
 
-			//foreach(string userid in biddedAuction.WatchingUserIDs)
-			//{
-			//	// Notify user
-			//	NotificationModel newNotif = new NotificationModel()
-			//	{
-			//		UserID = userid,
-			//		Content = notifContent,
-			//		Severity = notifSeverity,
-			//		RedirectURL = $"/auction/{biddedAuction.Id}"
-			//	};
+			string[] watchingUserIds = await WatchingService.GetUsersWatchingAuctionAsync(biddedAuction);
 
-			//	await Clients.User(userid).SendAsync("NewNotification", newNotif);
-			//}
+			//foreach(string userid in biddedAuction.WatchingUserIDs)
+			foreach(string userid in watchingUserIds)
+			{
+				// Notify user
+				NotificationModel newNotif = new NotificationModel()
+				{
+					UserID = userid,
+					Content = notifContent,
+					Severity = notifSeverity,
+					RedirectURL = $"/auction/{biddedAuction.Id}"
+				};
+
+				await Clients.User(userid).SendAsync("NewNotification", newNotif);
+			}
 
 			// Get all watching users
 			//using (var context = DbContextFactory.CreateDbContext())
