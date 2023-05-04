@@ -56,6 +56,23 @@ namespace AuctionSite.Services
 			}
 		}
 
+		public async Task<string[]> GetUsersWatchingAuctionAsync(AuctionModel auction)
+		{
+			List<string> userids = new List<string>();
+
+			using (var context = await DbContextFactory.CreateDbContextAsync())
+			{
+				var watchModels = context.Watching.Where(w => w.AuctionID == auction.Id).ToArray();
+
+				foreach(var model in watchModels)
+				{
+					userids.Add(model.WatchingUserID);
+				}
+			}
+
+			return userids.ToArray();
+		}
+
 		public async Task<AuctionModel[]> GetWatchedAuctionsAsync(string userid)
 		{
 			List<AuctionModel> watchedAuctions = new List<AuctionModel>();
