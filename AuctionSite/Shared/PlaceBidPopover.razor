@@ -6,6 +6,10 @@
 	<MudPopover AnchorOrigin="Origin.CenterCenter" TransformOrigin="Origin.CenterCenter" Open="@Enabled" Class="pa-4"> 
 		<MudText Typo="Typo.subtitle1">Enter bid for "@Auction.Title"</MudText>
 		<MudText Typo="Typo.subtitle2">Entry price: £@(StartPrice)</MudText>
+		@if(StartPrice > ReservePrice)
+		{
+			<MudText Typo="Typo.subtitle2">Seller's reserve price: £@(ReservePrice)</MudText>		
+		}
 		@if(!string.IsNullOrEmpty(ErrorAlert))
 		{
 			<MudAlert Severity="Severity.Error">@ErrorAlert</MudAlert>	
@@ -30,6 +34,7 @@
 	public string UserID;
 
 	public float StartPrice = 0f;
+	public float ReservePrice = 0f;
 	public float Amount;
 
 	public string ErrorAlert = "";
@@ -113,6 +118,7 @@
 		else
 			StartPrice = auction.StartPrice;
 
+		ReservePrice = auction.ReservePrice;
 
 		Amount = StartPrice + 1;
 
