@@ -20,7 +20,7 @@ else
 
 	<div class="d-flex flex-md-row flex-column flex-grow-1 gap-2">
 		<div class="">
-			<MudPaper Elevation="4" Class="px-4 mx-4">
+			<MudPaper Elevation="4" Class="pt-4 pb-4 px-4 mx-4">
 				<MudText Typo="Typo.h3">@auction.Title</MudText>
 				<MudText Typo="Typo.h5">Starting price: £@auction.StartPrice</MudText>
 				<MudText Typo="Typo.h6">
@@ -46,8 +46,10 @@ else
 				{
 					<MudText Typo="Typo.h5">Auction closes in @timeTillClosed.GetRemainingTime()</MudText>
 					<AuthorizeView Roles="@($"{Roles.Student}")">
-						<MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => OnBid())" Disabled="@(!auctionOpen)">Bid</MudButton>
-						<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => OnWatch())" Disabled="@(!auctionOpen)">Watch</MudButton>
+						<div class="justify-content-center align-center">
+							<MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => OnBid())" Disabled="@(!auctionOpen)">Bid</MudButton>
+							<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => OnWatch())" Disabled="@(!auctionOpen)">Watch</MudButton>
+						</div>
 					</AuthorizeView>
 				}
 				else
@@ -58,7 +60,7 @@ else
 		</div>
 		<MudSpacer/>
 		<div class="">
-			<MudPaper Elevation="4" Class="px-4 mx-4">
+			<MudPaper Elevation="4" Class="pt-4 px-4 mx-4">
 				<MudText Typo="Typo.h4">Bid history</MudText>
 				@if(bids is null || bids.Count() == 0)
 				{
@@ -126,7 +128,10 @@ else
 	{
 		base.OnAfterRender(firstRender);
 
-		BidPopover.OnBidSubmit += OnBidSubmit;
+		if(auction != null)
+		{
+			BidPopover.OnBidSubmit += OnBidSubmit;	
+		}
 	}
 
 	protected async override void TimerTick(object? stateInfo)
