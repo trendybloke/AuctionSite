@@ -1,5 +1,6 @@
 ﻿@using AuctionSite.Services
 @inject BiddingService biddingService
+@inject ISnackbar Snackbar
 
 <MudOverlay @bind-Visible="Enabled" DarkBackground="true">
 	<MudPopover AnchorOrigin="Origin.CenterCenter" TransformOrigin="Origin.CenterCenter" Open="@Enabled" Class="pa-4"> 
@@ -82,6 +83,8 @@
 		// close overlay
 		Enabled = false;
 		showLoading = false;
+
+		Snackbar.Add($"{Amount.ToString("C", System.Globalization.CultureInfo.CurrentCulture)} bid has been placed on {Auction.Title}", Severity.Success);
 
 		StateHasChanged();
 	}
