@@ -147,12 +147,12 @@ namespace AuctionSite.Hubs
 		//	//}
 		//}
 
-		public async Task WatchAuction(AuctionModel auction, string userid)
-		{
+		//public async Task WatchAuction(AuctionModel auction, string userid)
+		//{
 			//using(var context = DbContextFactory.CreateDbContext())
 			//{
 				
 			//}
-		}
+		//}
 	}
 }
