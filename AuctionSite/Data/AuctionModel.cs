@@ -13,7 +13,11 @@ namespace AuctionSite.Data
 		public string Title { get; set; }
 		public string Description { get; set; }
 
+		// Price that is initialized as the lowest amount already bid
 		public float StartPrice { get; set; }
+
+		//Lowest price that the buyer will accept
+		public float ReservePrice { get; set; }
 
 		public ItemCondition Condition { get; set; }
 		public AuctionState State { get; set; }
