@@ -45,12 +45,15 @@ else
 				@if (auctionOpen)
 				{
 					<MudText Typo="Typo.h5">Auction closes in @timeTillClosed.GetRemainingTime()</MudText>
+					<AuthorizeView Roles="@($"{Roles.Student}")">
+						<MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => OnBid())" Disabled="@(!auctionOpen)">Bid</MudButton>
+						<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => OnWatch())" Disabled="@(!auctionOpen)">Watch</MudButton>
+					</AuthorizeView>
 				}
-				@if (!CurrentUser.IsAdmin())
+				else
 				{
-					<MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => OnBid())" Disabled="@(!auctionOpen)">Bid</MudButton>
+					<MudText Typo="Typo.h5">Auction closed on @timeTillClosed.GetRemainingTime()</MudText>
 				}
-				<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => OnWatch())" Disabled="@(!auctionOpen)">Watch</MudButton>
 			</MudPaper>
 		</div>
 		<MudSpacer/>
