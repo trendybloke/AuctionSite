@@ -5,6 +5,8 @@
 @inject AuctionService AuctionService
 
 @using AuctionSite.Helpers
+@using AuctionSite.Enums
+@using System.Text;
 
 @if(!string.IsNullOrEmpty(query))
 {
@@ -40,6 +42,16 @@
 				@foreach(ConditionFilter filter in Enum.GetValues(typeof(ConditionFilter)))
 				{
 					<MudSelectItem Value="@filter">@filter</MudSelectItem>
+				}
+			</MudSelect>
+
+			<MudSpacer />
+
+			<MudSelect Label="Category" @bind-SelectedValues="selectedCategories" MultiSelection="true" 
+			MultiSelectionTextFunc="@(new Func<List<string>, string>(GetSelectedCategoriesText))">
+				@foreach(AuctionCategory category in Enum.GetValues(typeof(AuctionCategory)))
+				{
+					<MudSelectItem Value="@category">@category.ToFormattedString()</MudSelectItem>
 				}
 			</MudSelect>
 
@@ -84,6 +96,7 @@
 						<MudImage Src="placeholder-image.png"/>
 						<div>
 							<MudLink Href="@($"/auction/{result.Id}")" Target="_blank" Typo="Typo.h5"> @result.Title </MudLink>
+							<MudText Typo="Typo.h5">@result.Category.ToFormattedString()</MudText>
 							<MudText Typo="Typo.h5">Time remaining: @PageResultTimeSpans[result.Id].GetRemainingTime()</MudText>
 							<MudText Typo="Typo.h6">Starting at £@result.StartPrice</MudText>
 							<MudText Typo="Typo.h6">Condition: @result.Condition</MudText>
@@ -121,8 +134,35 @@
 	public enum ConditionFilter { Any, New, Used, Average, Poor }
 	private ConditionFilter conditionFilter = ConditionFilter.Any;
 
+	private IEnumerable<AuctionCategory> selectedCategories = new HashSet<AuctionCategory>() 
+																{
+																	AuctionCategory.Complete_Systems,
+																	AuctionCategory.Incomplete_Systems,
+																	AuctionCategory.Faulty_Systems,
+																	AuctionCategory.System_Components 
+																};
+
+	private AuctionCategory categoryFilter = (AuctionCategory)0b1111;
+
 	private float minimumPrice = 0.00f;
 	private float maximumPrice = 10000.00f;
+
+	private string GetSelectedCategoriesText(List<string> selectedValues)
+	{
+		if (selectedValues.Count == Enum.GetNames(typeof(AuctionCategory)).Count())
+			return "Any";
+
+		StringBuilder sb = new StringBuilder();
+		foreach(var val in selectedCategories)
+		{
+			sb.Append(val.ToFormattedString());
+			sb.Append(", ");
+		}
+
+		sb.Remove(sb.Length - 2, 2);
+
+		return sb.ToString();
+	}
 
 	protected override async void TimerTick(object? stateInfo)
 	{
@@ -164,11 +204,21 @@
 			FoundAuctions = auctions.ToList();
 
 			PageResultTimeSpans = new Dictionary<int, TimeSpan>();
+
+			Querying = false;
+		}
+
+		int categoryMask = 0;
+
+		foreach(var category in selectedCategories)
+		{
+			categoryMask = (int)((AuctionCategory)categoryMask | category);
 		}
 
 		QueryResults = FoundAuctions
 							.Where(a => a.Title.Contains(query, StringComparison.InvariantCultureIgnoreCase))
 							.Where(a => a.StartPrice >= minimumPrice && a.StartPrice <= maximumPrice)
+							.Where(a => (a.Category & (AuctionCategory)categoryMask) == a.Category)
 							.ToList();
 
 		if(conditionFilter != ConditionFilter.Any)

@@ -1,5 +1,6 @@
 namespace AuctionSite.Enums
 {
+	[Flags]
 	public enum AuctionCategory
 	{
 		// Examples for a category are stated as "Desktop PC", "Laptop", "Monitor", "Complete system (desktop with monitor)", "Graphics card"
@@ -13,5 +14,10 @@ namespace AuctionSite.Enums
 		// BitField can be used to imply multiple categories;
 			// A Complete and Faulty system
 			// An incomplete system consisting of a series of packaged components
+
+		Complete_Systems = 1,
+		Incomplete_Systems = 2,
+		Faulty_Systems = 4,
+		System_Components = 8
 	}
 }

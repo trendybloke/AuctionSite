@@ -32,6 +32,7 @@ else
 				<div>
 					@*<MudText Typo="Typo.h4">@context.Title</MudText>*@
 					<MudLink Href="@($"/auction/{context.Id}")" Typo="Typo.h4">@context.Title</MudLink>
+					<MudText Typo="Typo.h5">In @context.Category.ToFormattedString()</MudText>
 					<MudText Typo="Typo.h5">@AuctionTimeRemainings[context.Id]</MudText>
 					<MudText Typo="Typo.h6">@($"Starting price: {context.StartPrice.ToString("C", CultureInfo.CurrentCulture)}")</MudText>
 					@*<MudText Typo="Typo.h6">@($"Current price: {BiddingService.GetHighestBidAsync(context).Result.Amount}")</MudText>*@
@@ -59,6 +60,7 @@ else
 				</MudCardHeader>
 				<MudCardMedia Image="placeholder-image.png" Height="200"/>
 				<MudCardContent>
+					<MudText Typo="Typo.h6">In @auction.Category.ToFormattedString()</MudText>
 					<MudText Typo="Typo.h5">Closes in @AuctionTimeRemainings[auction.Id] </MudText>
 					<MudText Typo="Typo.h6">@($"Starting price: {auction.StartPrice.ToString("C", CultureInfo.CurrentCulture)}")</MudText>
 					<MudText Typo="Typo.h6">

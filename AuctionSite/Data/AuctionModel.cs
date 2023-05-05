@@ -20,6 +20,7 @@ namespace AuctionSite.Data
 		public float ReservePrice { get; set; }
 
 		public ItemCondition Condition { get; set; }
+		public AuctionCategory Category { get; set; }
 		public AuctionState State { get; set; }
 
 		public DateTime StartDate { get; set; }
