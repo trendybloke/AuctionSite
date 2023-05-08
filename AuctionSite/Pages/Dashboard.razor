@@ -6,6 +6,8 @@
 @inject BiddingService BiddingService
 @inject WatchingService WatchingService
 
+@inject UserManager<ApplicationUser> UserManager
+
 @inject IDialogService DialogService
 
 @if(loading)
@@ -37,6 +39,14 @@ else
 							<div>
 								<MudLink Href="@($"/auction/{auction.Id}")" Target="_blank" Typo="Typo.h5"> @auction.Title </MudLink>
 								<MudText Typo="Typo.h5">Time remaining: @AuctionTimespans[auction].GetRemainingTime()</MudText>
+								@if(BiddingService.GetBidHistory(auction).Count() > 0)
+								{
+									<MudText Typo="Typo.h6">Winner: @UserManager.FindByIdAsync(BiddingService.GetHighestBid(auction).UserID).Result.Email</MudText>
+								}
+								else
+								{
+									<MudButton Color="Color.Error" OnClick="@(() => OnDelete(auction))">Delete</MudButton>
+								}
 								<MudButton Color="Color.Secondary" OnClick="@(() => OnEdit(auction))">Edit</MudButton>
 							</div>
 						</div>
@@ -139,7 +149,7 @@ else
 @code {
 	bool loading = true;
 
-	AuctionModel[] AdminUserAuctions;
+	List<AuctionModel> AdminUserAuctions;
 	AuctionModel[] StudentUserWatchedAuctions;
 
 	List<AuctionModel> StudentUserBidAuctions;
@@ -216,7 +226,10 @@ else
 
 	private async Task PopulateAdminAuctionLists()
 	{
-		AdminUserAuctions = await AuctionService.GetAuctionsByAdminAsync(CurrentUser.GetUserID());
+		var adminAuctions = await AuctionService.GetAuctionsByAdminAsync(CurrentUser.GetUserID());
+
+		AdminUserAuctions = adminAuctions.ToList();
+
 		foreach(var auction in AdminUserAuctions)
 			AuctionTimespans.TryAdd(auction, auction.EndDate - DateTime.Now);
 	}
@@ -242,6 +255,37 @@ else
 			Snackbar.Add("Failed to save changes!", Severity.Error);
 
 		AuctionTimespans[auction] = auction.EndDate - auction.StartDate;
+
+		await InvokeAsync(StateHasChanged);
+	}
+
+	async void OnDelete(AuctionModel auction)
+	{
+		var parameters = new DialogParameters();
+		parameters.Add("ItemName", auction.Title);
+
+		var options = new DialogOptions()
+		{
+			CloseButton = false,
+			CloseOnEscapeKey = false
+		};
+
+		var confirm = await DialogService.ShowAsync<ConfirmDeleteDialog>($"Delete {auction.Title}", parameters, options);
+
+		await confirm.Result;
+
+		if (confirm.Result.IsCompleted)
+		{
+			var deleteResult = await AuctionService.DeleteAuctionAsync(auction);
+
+			if (deleteResult)
+			{
+				Snackbar.Add($"Deleted {auction.Title}", Severity.Info);
+				AdminUserAuctions.Remove(auction);
+			}
+			else
+				Snackbar.Add($"Unable to delete {auction.Title}", Severity.Error);
+		}
 
 		await InvokeAsync(StateHasChanged);
 	}

@@ -1,0 +1,21 @@
+﻿
+<MudDialog>
+	<DialogContent>
+		<MudText>Are you sure you want to delete @ItemName?</MudText>
+	</DialogContent>
+	<DialogActions>
+		<MudButton OnClick="Confirm">Delete</MudButton>
+		<MudButton OnClick="Cancel">Cancel</MudButton>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter]
+	MudDialogInstance MudDialog { get; set;}
+
+	[Parameter]
+	public string ItemName { get; set; }
+
+	void Confirm() => MudDialog.Close(DialogResult.Ok(true));
+	void Cancel() => MudDialog.Cancel();
+}

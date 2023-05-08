@@ -89,5 +89,26 @@ namespace AuctionSite.Services
 
 			return saveResult > 0;
 		}
+
+		public async Task<bool> DeleteAuctionAsync(AuctionModel auction)
+		{
+			int delResult;
+			using(var context = await DbContextFactory.CreateDbContextAsync())
+			{
+				int bidsOnAuction = context.Bids.Where(b => b.AuctionID == auction.Id).Count();
+
+				if(bidsOnAuction > 0)
+				{
+					// Someone has bid on this auction, therefore it cannot be deleted
+					return false;
+				}
+
+				context.Auctions.Remove(auction);
+
+				delResult = await context.SaveChangesAsync();
+			}
+
+			return delResult > 0;
+		}
 	}
 }
