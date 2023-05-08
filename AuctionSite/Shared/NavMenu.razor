@@ -1,5 +1,14 @@
 ﻿<MudNavMenu>
     <MudNavLink Href="/">Home</MudNavLink>
+
+    <!-- Admin only links -->
+    <AuthorizeView Roles="@($"{Roles.Admin}")">
+        <Authorized>
+            <MudNavLink Href="/auction/new">Create a New Auction</MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+
+    <!-- Logged in user links -->
     <AuthorizeView>
         <Authorized>
             <MudNavLink Href="/dashboard">Dashboard</MudNavLink>

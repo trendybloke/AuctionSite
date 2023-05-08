@@ -1,0 +1,141 @@
+﻿@page "/auction/new"
+@attribute [Authorize(Roles = $"{Roles.Admin}")]
+
+@inherits PageBase
+
+@inject AuctionService AuctionService
+
+<MudPaper Elevation="4" Class="pa-4 ma-4">
+	<MudText Typo="Typo.h3">Create New Auction</MudText>
+	<EditForm Model="auction">
+
+		<MudTextField	Disabled="loading"
+						Label="Title"
+						@bind-Value="auction.Title"/>
+
+		<MudTextField Disabled="loading"
+					  Label="Description"
+					  @bind-Value="auction.Description" />
+
+		<MudNumericField	Disabled="loading"
+							Label="Start Price"
+							@bind-Value="auction.StartPrice"
+							Adornment="Adornment.Start"
+							AdornmentText="£"/>
+
+		<MudNumericField	Disabled="loading"
+							Label="Reserve Price (optional)"
+							@bind-Value="auction.ReservePrice"
+							Adornment="Adornment.Start"
+							AdornmentText="£"/>
+
+		<MudSelect Disabled="loading"
+				   Label="Item Condition"
+				   T="ItemCondition"
+				   @bind-Value="auction.Condition">
+			<MudSelectItem Value="@ItemCondition.New">New</MudSelectItem>
+			<MudSelectItem Value="@ItemCondition.Used">Used</MudSelectItem>
+			<MudSelectItem Value="@ItemCondition.Average">Average</MudSelectItem>
+			<MudSelectItem Value="@ItemCondition.Poor">Poor</MudSelectItem>
+		</MudSelect>
+
+		<MudPaper>
+			<MudText>Categories</MudText>
+			<MudCheckBox Disabled="loading" Label="Complete system" T="bool" @bind-Checked="completeSys" />
+			<MudCheckBox Disabled="loading" Label="Incomplete system" T="bool" @bind-Checked="incompleteSys" />
+			<MudCheckBox Disabled="loading" Label="Faulty system" T="bool" @bind-Checked="faultySys" />
+			<MudCheckBox Disabled="loading" Label="System component" T="bool" @bind-Checked="sysComponent" />
+		</MudPaper>
+
+		<MudDatePicker	Disabled="loading"
+						Label="Start Date"
+						@bind-Date="startDate"/>
+
+		<MudTimePicker	Disabled="loading"
+						Label="Start Time"
+						@bind-Time="startTime"/>
+
+		<MudNumericField	Disabled="loading"
+							Label="Auction Duration (Days)"
+							Min="3"
+							Max="14"
+							@bind-Value="auctionDuration"/>
+
+		<MudSpacer />
+
+		<MudButton Disabled="loading" OnClick="@OnSubmit">Submit</MudButton>
+
+	</EditForm>
+	@if (loading)
+	{
+		<MudProgressLinear Indeterminate="true" Color="Color.Secondary" />
+	}
+</MudPaper>
+
+@code {
+	bool loading = false;
+
+	AuctionModel auction;
+
+	// category flags
+	bool completeSys = false;
+	bool incompleteSys = false;
+	bool faultySys = false;
+	bool sysComponent = false;
+	//
+
+	DateTime? startDate { get; set; }
+
+	TimeSpan? startTime { get; set; }
+
+	int auctionDuration = 3;
+
+	protected override Task OnInitializedAsync()
+	{
+		auction = new AuctionModel()
+		{
+			CreatorUserID = CurrentUser.GetUserID(),
+			ImageIDs = new List<string>()
+		};
+
+		return base.OnInitializedAsync();
+	}
+
+	public async void OnSubmit()
+	{
+		loading = true;
+
+		await InvokeAsync(StateHasChanged);
+
+		// build auction
+		auction.StartDate = startDate.Value.Add(startTime.Value);
+		auction.EndDate = auction.StartDate.AddDays(auctionDuration);
+
+		int categoryField = 0;
+		categoryField += completeSys ? 1 : 0;
+		categoryField += incompleteSys ? 2 : 0;
+		categoryField += faultySys ? 4 : 0;
+		categoryField += sysComponent ? 8 : 0;
+
+		auction.Category = (AuctionCategory)categoryField;
+
+		// auction has been built
+
+		var success = await AuctionService.CreateAuctionAsync(auction);
+
+		if (success)
+		{
+			Snackbar.Add($"Auction {auction.Title} has been added", Severity.Success);
+			auction = new AuctionModel();
+		}
+		else
+		{
+			Snackbar.Add($"Failed to add Auction", Severity.Error);
+		}
+
+		loading = false;
+
+		await InvokeAsync(StateHasChanged);
+	}
+
+}

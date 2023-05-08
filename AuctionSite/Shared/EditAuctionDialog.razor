@@ -34,10 +34,10 @@
 							Label="Item Condition"
 							T="ItemCondition"
 							@bind-Value="auction.Condition">
-@*				@foreach(var condition in Enum.GetValues(typeof(ItemCondition)))
-				{
-					<MudSelectItem Value="condition">@condition</MudSelectItem>
-				}*@
+				<MudSelectItem Value="@ItemCondition.New">New</MudSelectItem>
+				<MudSelectItem Value="@ItemCondition.Used">Used</MudSelectItem>
+				<MudSelectItem Value="@ItemCondition.Average">Average</MudSelectItem>
+				<MudSelectItem Value="@ItemCondition.Poor">Poor</MudSelectItem>
 			</MudSelect>
 
 			<MudPaper>
