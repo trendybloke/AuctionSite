@@ -51,5 +51,43 @@ namespace AuctionSite.Services
 
 			return adminAuctions;
 		}
+
+		public async Task<bool> CreateAuctionAsync(AuctionModel auction)
+		{
+			int saveResult;
+
+			using(var context = await DbContextFactory.CreateDbContextAsync())
+			{
+				context.Auctions.Add(auction);
+
+				saveResult = await context.SaveChangesAsync();
+			}
+
+			return saveResult > 0;
+		}
+
+		public async Task<bool> EditAuctionAsync(AuctionModel newAuction)
+		{
+			int saveResult;
+
+			using (var context = await DbContextFactory.CreateDbContextAsync())
+			{
+				var oldAuction = context.Auctions.Find(newAuction.Id);
+
+				oldAuction.Title = newAuction.Title;
+				oldAuction.Description = newAuction.Description;
+				oldAuction.StartPrice = newAuction.StartPrice;
+				oldAuction.ReservePrice = newAuction.ReservePrice;
+				oldAuction.Condition = newAuction.Condition;
+				oldAuction.State = newAuction.State;
+				oldAuction.StartDate = newAuction.StartDate;
+				oldAuction.EndDate = newAuction.EndDate;
+				oldAuction.ImageIDs = newAuction.ImageIDs;
+
+				saveResult = await context.SaveChangesAsync();
+			}
+
+			return saveResult > 0;
+		}
 	}
 }

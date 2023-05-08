@@ -6,6 +6,8 @@
 @inject BiddingService BiddingService
 @inject WatchingService WatchingService
 
+@inject IDialogService DialogService
+
 @if(loading)
 {
 	<div class="d-flex justify-content-center" style="margin-top: 40vh">
@@ -35,6 +37,7 @@ else
 							<div>
 								<MudLink Href="@($"/auction/{auction.Id}")" Target="_blank" Typo="Typo.h5"> @auction.Title </MudLink>
 								<MudText Typo="Typo.h5">Time remaining: @AuctionTimespans[auction].GetRemainingTime()</MudText>
+								<MudButton Color="Color.Secondary" OnClick="@(() => OnEdit(auction))">Edit</MudButton>
 							</div>
 						</div>
 					</MudPaper>
@@ -216,6 +219,31 @@ else
 		AdminUserAuctions = await AuctionService.GetAuctionsByAdminAsync(CurrentUser.GetUserID());
 		foreach(var auction in AdminUserAuctions)
 			AuctionTimespans.TryAdd(auction, auction.EndDate - DateTime.Now);
+	}
+
+	async void OnEdit(AuctionModel auction)
+	{
+		var parameters = new DialogParameters();
+		parameters.Add("auction", auction);
+		parameters.Add("createMode", CreateMode.Edit);
+		parameters.Add("userID", CurrentUser.GetUserID());
+		parameters.Add("startDate", auction.StartDate);
+		parameters.Add("startTime", auction.StartDate.TimeOfDay);
+		parameters.Add("auctionDuration", (auction.EndDate - auction.StartDate).Days);
+
+		var dialogResult = await DialogService.Show<EditAuctionDialog>($"Edit {auction.Title}", parameters).Result;
+
+		if (dialogResult.Canceled)
+			return;
+
+		if ((bool)dialogResult.Data)
+			Snackbar.Add("Changes saved successfully!", Severity.Success);
+		else
+			Snackbar.Add("Failed to save changes!", Severity.Error);
+
+		AuctionTimespans[auction] = auction.EndDate - auction.StartDate;
+
+		await InvokeAsync(StateHasChanged);
 	}
 
 	protected override void TimerTick(object stateInfo)

@@ -1,0 +1,154 @@
+﻿@using System.Text;
+@inject AuctionService AuctionService
+
+<MudDialog>
+	<DialogContent>
+		@if (loading)
+		{
+			<MudProgressLinear Indeterminate="true" Color="Color.Secondary"/>
+		}
+
+		<EditForm Model="@auction" OnValidSubmit="Submit">
+		<DataAnnotationsValidator/>
+			<MudTextField Disabled="loading"
+							Label="Title"
+							@bind-Value="auction.Title"/>
+
+			<MudTextField Disabled="loading"
+							Label="Description"
+							@bind-Value="auction.Description" />
+
+			<MudNumericField Disabled="loading"
+							Label="Start Price"
+							@bind-Value="auction.StartPrice"
+							Adornment="Adornment.Start"
+							AdornmentText="£"/>
+
+			<MudNumericField Disabled="loading"
+							Label="Reserve Price"
+							@bind-Value="auction.ReservePrice"
+							Adornment="Adornment.Start"
+							AdornmentText="£"/>
+
+			<MudSelect		Disabled="loading"
+							Label="Item Condition"
+							T="ItemCondition"
+							@bind-Value="auction.Condition">
+@*				@foreach(var condition in Enum.GetValues(typeof(ItemCondition)))
+				{
+					<MudSelectItem Value="condition">@condition</MudSelectItem>
+				}*@
+			</MudSelect>
+
+			<MudPaper>
+				<MudText>Categories</MudText>
+				<MudCheckBox Disabled="loading" Label="Complete system" T="bool" @bind-Checked="completeSys"/>
+				<MudCheckBox Disabled="loading" Label="Incomplete system" T="bool" @bind-Checked="incompleteSys"/>
+				<MudCheckBox Disabled="loading" Label="Faulty system" T="bool" @bind-Checked="faultySys"/>
+				<MudCheckBox Disabled="loading" Label="System component" T="bool" @bind-Checked="sysComponent"/>
+			</MudPaper>
+
+			<MudDatePicker	Disabled="loading"
+							Label="Start Date"
+							@bind-Date="startDate"/>
+
+			<MudTimePicker	Disabled="loading"
+							Label="Start time"
+							@bind-Time="startTime"/>
+
+			<MudNumericField Disabled="loading"
+							Label="Auction Duration (Days)"
+							Min="3"
+							Max="14"
+							@bind-Value="auctionDuration"/>
+		</EditForm>
+
+	</DialogContent>
+	<DialogActions>
+		<MudButton OnClick="Submit" Disabled="loading">Submit</MudButton>
+		<MudButton OnClick="Cancel" Disabled="loading">Cancel</MudButton>
+	</DialogActions>
+</MudDialog>
+
+@code {
+
+	[CascadingParameter] 
+	MudDialogInstance MudDialog { get; set; }
+
+	[Parameter]
+	public AuctionModel auction { get; set; } = new AuctionModel();
+
+	[Parameter]
+	public CreateMode createMode { get; set; }
+
+	[Parameter]
+	public string userID { get; set; }
+
+	[Parameter]
+	public DateTime? startDate { get; set; }
+
+	[Parameter]
+	public TimeSpan? startTime { get; set; }
+
+	[Parameter]
+	public int auctionDuration { get; set; }
+
+	public bool loading = false;
+
+	//Categories
+	private bool completeSys;
+	private bool incompleteSys;
+	private bool faultySys;
+	private bool sysComponent;
+	//
+
+	protected override Task OnInitializedAsync()
+	{
+		if(createMode == CreateMode.Edit)
+		{
+			auctionDuration = (auction.EndDate - auction.StartDate).Days;
+			completeSys = ((int)auction.Category & 0b0001) == 0b0001;
+			incompleteSys = ((int)auction.Category & 0b0010) == 0b0010;
+			faultySys = ((int)auction.Category & 0b0100) == 0b0100;
+			sysComponent = ((int)auction.Category & 0b1000) == 0b1000;
+		}
+
+		return base.OnInitializedAsync();
+	}
+
+	async void Submit()
+	{
+		bool Success;
+
+		loading = true;
+
+		await InvokeAsync(StateHasChanged);
+
+		auction.StartDate = startDate.Value.Add(startTime.Value);
+		auction.EndDate = auction.StartDate.AddDays(auctionDuration);
+
+		int categoryField = 0;
+		categoryField += completeSys ? 1 : 0;
+		categoryField += incompleteSys ? 2 : 0;
+		categoryField += faultySys ? 4 : 0;
+		categoryField += sysComponent ? 8 : 0;
+
+		auction.Category = (AuctionCategory)categoryField;
+
+		if(createMode == CreateMode.Create)
+		{
+			auction.CreatorUserID = userID;
+
+
+			Success = await AuctionService.CreateAuctionAsync(auction);
+		}
+		else
+		{
+			Success = await AuctionService.EditAuctionAsync(auction);
+		}
+
+		MudDialog.Close(DialogResult.Ok(Success));
+	}
+
+	void Cancel() => MudDialog.Cancel();
+}

@@ -10,6 +10,8 @@
 @inject BiddingService BiddingService
 @inject WatchingService WatchingService
 
+@inject IDialogService DialogService
+
 @if(auction == null)
 {
 	<p><em>Loading...</em></p>
@@ -43,6 +45,16 @@ else
 				<MudText Typo="Typo.body1">@auction.Description</MudText>
 				<br/>
 				<MudText Typo="Typo.h6">@auctionStateText</MudText>
+
+				<AuthorizeView Roles="@($"{Roles.Admin}")">
+					<MudButton	Variant="Variant.Filled" 
+								Color="Color.Secondary" 
+								OnClick="@(() => OnEdit())"
+								Disabled="@(CurrentUser.GetUserID() != auction.CreatorUserID)">
+								Edit
+					</MudButton>
+				</AuthorizeView>
+
 				@if (auctionOpen)
 				{
 					<MudText Typo="Typo.h5">Auction closes in @timeTillClosed.GetRemainingTime()</MudText>
@@ -177,5 +189,30 @@ else
 			Snackbar.Add($"Couldn't watch / unwatch {auction.Title} because Josh needs to put that in!", Severity.Error);
 		}
 
+	}
+
+	async void OnEdit()
+	{
+		var parameters = new DialogParameters();
+		parameters.Add("auction", auction);
+		parameters.Add("createMode", CreateMode.Edit);
+		parameters.Add("userID", CurrentUser.GetUserID());
+		parameters.Add("startDate", auction.StartDate);
+		parameters.Add("startTime", auction.StartDate.TimeOfDay);
+		parameters.Add("auctionDuration", (auction.EndDate - auction.StartDate).Days);
+
+		var dialogResult = await DialogService.Show<EditAuctionDialog>($"Edit {auction.Title}", parameters).Result;
+
+		if (dialogResult.Canceled)
+			return;
+
+		if ((bool)dialogResult.Data)
+			Snackbar.Add("Changes saved successfully!", Severity.Success);
+		else
+			Snackbar.Add("Failed to save changes!", Severity.Error);
+
+		timeTillClosed = auction.EndDate - auction.StartDate;
+
+		await InvokeAsync(StateHasChanged);
 	}
 }
