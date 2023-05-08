@@ -119,6 +119,11 @@
 
 		auction.Category = (AuctionCategory)categoryField;
 
+		if(startDate >= DateTime.Now)
+		{
+			auction.State = AuctionState.Open;
+		}
+
 		// auction has been built
 
 		var success = await AuctionService.CreateAuctionAsync(auction);

@@ -9,6 +9,7 @@
 @inject AuctionService AuctionService
 @inject BiddingService BiddingService
 @inject WatchingService WatchingService
+@inject UserManager<ApplicationUser> UserManager
 
 @inject IDialogService DialogService
 
@@ -84,6 +85,9 @@ else
 					<MudDataGrid Items="bids" FixedHeader="true" Height="400px">
 						<Columns>
 							<PropertyColumn Property="b => b.CreatedOn" Title="Placed on" />
+							<AuthorizeView Roles="@($"{Roles.Admin}")">
+								<PropertyColumn Property="b => UserManager.FindByIdAsync(b.UserID).Result.Email" Title="User Email" />
+							</AuthorizeView>
 							<PropertyColumn Property="@(b => b.Amount.ToString("C", CultureInfo.CurrentCulture))" Title="Amount" />
 						</Columns>
 					</MudDataGrid>
@@ -115,15 +119,6 @@ else
 	protected async override Task OnInitializedAsync()
 	{
 		await base.OnInitializedAsync();
-
-		// refactor?
-		//using(var context = await DbContextFactory.CreateDbContextAsync())
-		//{
-		//	auction = context
-		//				.Auctions
-		//				.Where(a => a.Id == Id)
-		//				.SingleOrDefault();
-		//}
 
 		auction = await AuctionService.GetAuctionAsync(Id);
 
