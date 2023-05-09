@@ -95,7 +95,7 @@ else
 	AuctionModel[]? RecentAuctions;
 	AuctionModel[]? NewAuctions;
 
-	private HubConnection? bidHubConnection;
+	//private HubConnection? bidHubConnection;
 
 	int selectedCarouselItem;
 
@@ -103,11 +103,6 @@ else
 	{
 		await base.OnInitializedAsync();
 
-		// AuctionModel collection initializations
-		//using(var context = await DbContextFactory.CreateDbContextAsync())
-		//{
-		//	Auctions = context.Auctions.ToArray();
-		//}
 
 		Auctions = await AuctionService.GetAuctionsAsync();
 
@@ -136,6 +131,13 @@ else
 		bidHubConnection = new HubConnectionBuilder()
 									.WithUrl(NavigationManager.ToAbsoluteUri("/BiddingHub"))
 									.Build();
+
+		// Update-Bids
+		bidHubConnection.On("Update-Bids", () =>
+		{
+			Snackbar.Add("Update-Bids received", Severity.Info);
+			StateHasChanged();
+		});
 
 		await bidHubConnection.StartAsync();
 

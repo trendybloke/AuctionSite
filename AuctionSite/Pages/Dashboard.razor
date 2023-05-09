@@ -185,9 +185,36 @@ else
 			await PopulateStudentAuctionLists();
 		}
 
+		// Init. hub connection
+		bidHubConnection = new HubConnectionBuilder()
+									.WithUrl(NavigationManager.ToAbsoluteUri("/BiddingHub"))
+									.Build();
+
+		// Update-bids
+		bidHubConnection.On("Update-Bids", OnUpdateBids);
+
+		await bidHubConnection.StartAsync();
+
 		// Page has loaded
 		loading = false;
 		await InvokeAsync(StateHasChanged);
+	}
+
+	public void OnUpdateBids()
+	{
+		// Admin is updated via statehaschanged
+
+		Snackbar.Add("Update-Bids received", Severity.Info);
+
+		if (CurrentUser.IsStudent())
+		{
+			foreach (var auctionModel in StudentUserBidAuctions)
+			{
+				WinningAuction[auctionModel] = BiddingService.GetHighestBid(auctionModel).UserID == CurrentUser.GetUserID();
+			}
+		}
+
+		StateHasChanged();
 	}
 
 	private async Task PopulateStudentAuctionLists()

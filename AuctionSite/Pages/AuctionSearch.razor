@@ -3,6 +3,7 @@
 @inherits RealTimePage
 
 @inject AuctionService AuctionService
+@inject BiddingService BiddingService
 
 @using AuctionSite.Helpers
 @using AuctionSite.Enums
@@ -99,6 +100,13 @@
 							<MudText Typo="Typo.h5">@result.Category.ToFormattedString()</MudText>
 							<MudText Typo="Typo.h5">Time remaining: @PageResultTimeSpans[result.Id].GetRemainingTime()</MudText>
 							<MudText Typo="Typo.h6">Starting at £@result.StartPrice</MudText>
+
+							<!-- INSANE PERFORMANCE OVERHEAD IF UNCOMMENTED --> 
+@*							@if(BiddingService.GetBidHistory(result).Count() != 0)
+							{
+								<MudText Typo="Typo.h6">Current Price is £@BiddingService.GetHighestBid(result).Amount</MudText>
+							}*@
+
 							<MudText Typo="Typo.h6">Condition: @result.Condition</MudText>
 							<MudText>@result.Description</MudText>
 						</div>
@@ -179,6 +187,17 @@
 		}
 
 		base.TimerTick(stateInfo);
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		await base.OnInitializedAsync();
+
+		// Update-Bids
+		bidHubConnection.On("Update-Bids", () =>
+		{
+			StateHasChanged();
+		});
 	}
 
 	protected override async Task OnAfterRenderAsync(bool firstRender)

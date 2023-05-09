@@ -1,0 +1,46 @@
+﻿@inject UserManager<ApplicationUser> UserManager
+@using System.Security.Claims
+
+<AuthorizeView Roles="@($"{Roles.Student}")">
+	<MudText Class="pr-4">Balance: £@balance</MudText>
+</AuthorizeView>
+
+@code {
+	float balance = 0f;
+
+	[CascadingParameter]
+	protected Task<AuthenticationState> AuthenticationStateTask { get; set; }
+
+	protected ClaimsPrincipal? CurrentUser
+	{
+		get
+		{
+			var authState = AuthenticationStateTask.Result;
+			var user = authState.User;
+			return user;
+		}
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		await base.OnInitializedAsync();
+
+		await UpdateBalance();
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		await base.OnAfterRenderAsync(firstRender);
+
+		await UpdateBalance();
+	}
+
+	async Task UpdateBalance()
+	{
+		var user = await UserManager.FindByIdAsync(CurrentUser.GetUserID());
+
+		balance = user.Balance;
+
+		await InvokeAsync(StateHasChanged);
+	}
+}

@@ -5,6 +5,7 @@
 @using AuctionSite.Services
 @using System.Text
 @using System.Globalization
+@using Microsoft.AspNetCore.SignalR.Client
 
 @inject AuctionService AuctionService
 @inject BiddingService BiddingService
@@ -129,6 +130,19 @@ else
 
 		bids = await BiddingService.GetBidHistoryAsync(auction);
 
+		//bidHubConnection = new HubConnectionBuilder()
+		//							.WithUrl(NavigationManager.ToAbsoluteUri("/BiddingHub"))
+		//							.Build();
+
+		// Update-Bids -- Doesn't seem to update bids in time?
+		//bidHubConnection.On("Update-Bids", () =>
+		//{
+		//	bids = BiddingService.GetBidHistory(auction);
+		//	StateHasChanged();
+		//});
+
+		await bidHubConnection.StartAsync();
+
 		await InvokeAsync(StateHasChanged);
 	}
 
@@ -136,7 +150,7 @@ else
 	{
 		base.OnAfterRender(firstRender);
 
-		if(auction != null)
+		if(auction != null && BidPopover is not null)
 		{
 			BidPopover.OnBidSubmit += OnBidSubmit;	
 		}
@@ -146,6 +160,8 @@ else
 	{
 		timeTillClosed = timeTillClosed.Subtract(TimeSpan.FromSeconds(1));
 
+		bids = BiddingService.GetBidHistory(auction);
+
 		base.TimerTick(stateInfo);
 	}
 
@@ -154,13 +170,15 @@ else
 		BidPopover.Enable(auction, CurrentUser.GetUserID());
 	}
 
-	void OnBidSubmit(object sender, BidModel bid)
+	async void OnBidSubmit(object sender, BidModel bid)
 	{
 		var bidHist = BiddingService.GetBidHistory(auction).ToList();
 
 		//bidHist.Add(bid);
 
 		bids = bidHist.OrderByDescending(b => b.Amount).ToArray();
+
+		await bidHubConnection.SendAsync("PlaceBid", bid);
 
 		StateHasChanged();
 	}

@@ -8,7 +8,7 @@ namespace AuctionSite.Pages
 	{
 		Timer? timer;
 
-		HubConnection? bidHubConnection;
+		protected HubConnection? bidHubConnection;
 
 		protected async override Task OnInitializedAsync()
 		{
@@ -20,7 +20,7 @@ namespace AuctionSite.Pages
 			// bid hub connection
 			bidHubConnection = new HubConnectionBuilder()
 				.WithUrl(NavigationManager.ToAbsoluteUri("/BiddingHub"))
-				.Build();	
+				.Build();
 		}
 
 		protected virtual async Task PlaceBid(BidModel bidModel)

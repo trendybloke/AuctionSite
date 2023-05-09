@@ -12,17 +12,23 @@
 			<MudTextField	
 				Label="Email / Username" 
 				@bind-Value="LoginUserData.Email" 
-				For="@(() => LoginUserData.Email)"/>
+				For="@(() => LoginUserData.Email)"
+				Disabled="loading"/>
 			<MudTextField	
 				Label="Password" 
 				@bind-Value="LoginUserData.Password" 
 				For="@(() => LoginUserData.Password)" 
-				InputType="InputType.Password"/>
+				InputType="InputType.Password"
+				Disabled="loading"/>
 		</MudCardContent>
 		<MudCardActions>
-			<MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto">
+			<MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto" Disabled="loading">
 				Sign in
 			</MudButton>
+			@if (loading)
+			{
+				<MudProgressCircular Indeterminate="true" Size="Size.Small"/>
+			}
 		</MudCardActions>
 	</MudCard>
 </EditForm>
@@ -33,9 +39,13 @@
 	[Parameter]
 	public string? ReturnPath { get; set; }
 
+	bool loading = false;
 
 	public async Task OnValidSubmit()
 	{
+		loading = true;
+		await InvokeAsync(StateHasChanged);
+
 		try
 		{
 			var user = await UserManager.FindByEmailAsync(LoginUserData.Email) ?? await UserManager.FindByNameAsync(LoginUserData.Email);
@@ -64,5 +74,8 @@
 		{
 			Snackbar.Add(ex.Message, Severity.Error);
 		}
+
+		loading = false;
+		await InvokeAsync(StateHasChanged);
 	}
 }

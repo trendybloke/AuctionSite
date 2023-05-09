@@ -1,10 +1,14 @@
 ﻿@inherits LayoutComponentBase
-@inject NavigationManager Navigation
-@inject ISnackbar Snackbar
+
 @using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @using AuctionSite.Data
 @using AuctionSite.Helpers
 @using System.Security.Claims
+
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject ProtectedLocalStorage SessionStore
 
 <PageTitle>AuctionSite</PageTitle>
 
@@ -14,6 +18,7 @@
         <MudSpacer />
         <AuctionSearchBar />
         <MudSpacer />
+        <BalanceDisplay />
         <NotificationDisplay @ref="notifDisplay"/>
     </MudAppBar>
     <MudDrawer @bind-Open="@sideOpen" Elevation="1">
@@ -21,6 +26,8 @@
             <LoginDisplay />
         </MudDrawerHeader>
         <NavMenu />
+        <MudSpacer />
+        <MudSwitch T="bool" CheckedChanged="ToggleDarkTheme" Label="Dark theme" Class="pl-4"/>
     </MudDrawer>
     <MudMainContent>
         <MudContainer Style="padding-top: 20px">
@@ -28,7 +35,7 @@
         </MudContainer>
 
         <!-- MudBlazor reqs. -->
-        <MudThemeProvider />
+        <MudThemeProvider IsDarkMode="@darkMode"/>
         <MudDialogProvider />
         <MudSnackbarProvider />
     </MudMainContent>
@@ -36,6 +43,8 @@
 
 @code {
     bool sideOpen = false;
+
+    bool darkMode;
 
     void ToggleSide() => sideOpen = !sideOpen;
 
@@ -56,9 +65,17 @@
         }
     }
 
+    async Task ToggleDarkTheme()
+    {
+        darkMode = !darkMode;
+
+        await SessionStore.SetAsync("DarkMode", darkMode);
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
+
 
         hubConnection = new HubConnectionBuilder()
                             .WithUrl(Navigation.ToAbsoluteUri("/BiddingHub"))
@@ -74,6 +91,20 @@
         });
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            var isDark = await SessionStore.GetAsync<bool>("DarkMode");
+
+            darkMode = isDark.Success ? isDark.Value : false;
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
     protected override void OnAfterRender(bool firstRender)
     {
         // Notif Display is enabled if a user is logged in.
@@ -83,7 +114,7 @@
         {
             notifDisplay.PopulateNotifications(CurrentUser.GetUserID());
         }
-
+        
         InvokeAsync(StateHasChanged);
     }
 }

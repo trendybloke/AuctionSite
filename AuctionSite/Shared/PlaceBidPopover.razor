@@ -1,5 +1,7 @@
 ﻿@using AuctionSite.Services
+
 @inject BiddingService biddingService
+@inject UserManager<ApplicationUser> UserManager
 @inject ISnackbar Snackbar
 
 <MudOverlay @bind-Visible="Enabled" DarkBackground="true">
@@ -64,6 +66,27 @@
 			return;
 		}
 
+		// Verify User balance
+		var user = await UserManager.FindByIdAsync(UserID);
+
+		var userBalance = user.Balance;
+
+		if(userBalance < Amount)
+		{
+			showLoading = false;
+			ErrorAlert = "Your balance is too low to place this bid!";
+			StateHasChanged();
+			return;
+		}
+
+		if(userBalance < StartPrice)
+		{
+			showLoading = false;
+			ErrorAlert = "Your balance is too low to bid on this auction!";
+			StateHasChanged();
+			return;
+		}
+
 		// build bidmodel
 		BidModel newBid = new BidModel()
 		{
@@ -73,10 +96,13 @@
 			CreatedOn = DateTime.Now
 		};
 
-		await Task.Delay(3000);
-
 		// Place Bid through service
 		await biddingService.PlaceBidAsync(newBid);
+
+		// Subtract user's balance
+		user.Balance -= newBid.Amount;
+
+		await UserManager.UpdateAsync(user);
 
 		// return through OnBidSubmit 
 		// -- Make sure no listeners try to do use the service --
