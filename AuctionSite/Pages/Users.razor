@@ -1,0 +1,189 @@
+﻿@page "/users"
+@using System.Security.Claims;
+@attribute [Authorize(Roles=$"{Roles.Admin}")]
+
+@inject UserManager<ApplicationUser> UserManager
+
+@inject IDialogService DialogService
+
+@inherits PageBase
+
+@if (loading)
+{
+	<MudText><em>Loading...</em></MudText>
+}
+else
+{
+	<MudTable	Items="users"
+				ReadOnly="loading"
+				@bind-SelectedItem="selectedUser"
+				Dense="true"
+				CanCancelEdit="true"
+				RowEditPreview="BackupUser"
+				RowEditCancel="CancelChange"
+				RowEditCommit="CommitChange">
+			<ToolBarContent>
+				<MudText Typo="Typo.h6">Users</MudText>
+			</ToolBarContent>
+			<HeaderContent>
+				<MudTh><MudTableSortLabel SortBy="new Func<ApplicationUser, object>(u => u.Id)">ID</MudTableSortLabel></MudTh>
+				<MudTh><MudTableSortLabel SortBy="new Func<ApplicationUser, object>(u => u.UserName)">Username</MudTableSortLabel></MudTh>
+				<MudTh><MudTableSortLabel SortBy="new Func<ApplicationUser, object>(u => u.Email)">Email</MudTableSortLabel></MudTh>
+				<MudTh><MudTableSortLabel SortBy="new Func<ApplicationUser, object>(u => u.Balance)">Account Balance</MudTableSortLabel></MudTh>
+				<MudTh>Student</MudTh>
+				<MudTh>Admin</MudTh>
+				<MudTh></MudTh>
+			</HeaderContent>
+			<RowTemplate>
+				<MudTd DataLabel="ID">@context.Id</MudTd>
+				<MudTd DataLabel="Username">@context.UserName</MudTd>
+				<MudTd DataLabel="Email">@context.Email</MudTd>
+				<MudTd DataLabel="Account balance">£@context.Balance</MudTd>
+				<MudTd DataLabel="Student"><MudCheckBox T="bool" ReadOnly="true" Checked="@studentMap[context]"/></MudTd>
+				<MudTd DataLabel="Admin"><MudCheckBox T="bool" ReadOnly="true" Checked="@adminMap[context]"/></MudTd>
+				<MudTd><MudButton Color="Color.Error" OnClick="@(() => OnDeleteClicked(context))">Delete</MudButton></MudTd>
+			</RowTemplate>
+			<RowEditingTemplate>
+				<MudTd>@context.Id</MudTd>
+				<MudTd DataLabel="Username">
+					<MudTextField @bind-Value="@context.UserName" Required />
+				</MudTd>
+				<MudTd DataLabel="Email">
+					<MudTextField @bind-Value="@context.Email" Required />
+				</MudTd>
+				<MudTd DataLabel="Account Balance">
+					<MudNumericField @bind-Value="@context.Balance" Adornment="Adornment.Start" AdornmentText="£" Required />
+				</MudTd>
+				<MudTd DataLabel="Student">
+					<MudCheckBox T="bool" @bind-Checked="studentMap[context]"/>
+				</MudTd>
+				<MudTd DataLabel="Admin">
+					<MudCheckBox T="bool" @bind-Checked="adminMap[context]"/>
+				</MudTd>
+			</RowEditingTemplate>
+			<EditButtonContent Context="button">
+				<MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.Edit" Class="pa-0" OnClick="@button.ButtonAction" Disabled="@button.ButtonDisabled"/>
+			</EditButtonContent>
+	</MudTable>
+}
+
+
+@code {
+	List<ApplicationUser> users;
+	Dictionary<ApplicationUser, bool> studentMap;
+	Dictionary<ApplicationUser, bool> adminMap;
+
+	ApplicationUser selectedUser;
+	ApplicationUser userBeforeEdit;
+	bool studentBeforeEdit;
+	bool adminBeforeEdit;
+
+	bool loading = true;
+
+	void BackupUser(object user)
+	{
+		userBeforeEdit = new ApplicationUser()
+		{
+			UserName = ((ApplicationUser)user).UserName,
+			Email = ((ApplicationUser)user).Email,
+			Balance = ((ApplicationUser)user).Balance
+		};
+
+		studentBeforeEdit = studentMap[(ApplicationUser)user];
+		adminBeforeEdit = adminMap[(ApplicationUser)user];
+	}
+
+	void CancelChange(object user)
+	{
+		((ApplicationUser)user).UserName = userBeforeEdit.UserName;
+		((ApplicationUser)user).Email = userBeforeEdit.Email;
+		((ApplicationUser)user).Balance = userBeforeEdit.Balance;
+
+		studentMap[(ApplicationUser)user] = studentBeforeEdit;
+		adminMap[(ApplicationUser)user] = adminBeforeEdit;
+
+		Snackbar.Add("Edits cancelled", Severity.Warning);
+	}
+
+	async void CommitChange(object user)
+	{
+		var userUpdateResult = await UserManager.UpdateAsync((ApplicationUser)user);
+
+		List<string> userRoles = new List<string>()
+		{
+			studentMap[(ApplicationUser)user] ? Roles.Student : "",
+			adminMap[(ApplicationUser)user] ? Roles.Admin : ""
+		};
+
+		userRoles.RemoveAll(r => String.IsNullOrEmpty(r));
+
+		if (studentMap[(ApplicationUser)user] && await UserManager.IsInRoleAsync((ApplicationUser)user, Roles.Student))
+			userRoles.Remove(Roles.Student);
+
+		if(adminMap[(ApplicationUser)user] && await UserManager.IsInRoleAsync((ApplicationUser)user, Roles.Admin))
+			userRoles.Remove(Roles.Admin);
+
+		IdentityResult roleUpdateResult;
+
+		if (userRoles.Count > 0)
+			roleUpdateResult = await UserManager.AddToRolesAsync((ApplicationUser)user, userRoles);
+		else
+			roleUpdateResult = IdentityResult.Success;
+
+		if (userUpdateResult.Succeeded && roleUpdateResult.Succeeded)
+		{
+			Snackbar.Add("Edits saved", Severity.Success);		
+		}
+		else
+			Snackbar.Add("Could not save all edits", Severity.Error);
+	}
+
+	async void OnDeleteClicked(ApplicationUser user)
+	{
+		var parameters = new DialogParameters();
+		parameters.Add("ItemName", user.UserName);
+
+		var options = new DialogOptions()
+		{
+			CloseButton = false,
+			CloseOnEscapeKey = false
+		};
+
+		var confirm = await DialogService.ShowAsync<ConfirmDeleteDialog>($"Delete {user.UserName}", parameters, options);
+
+		await confirm.Result;
+
+		if (confirm.Result.IsCompleted)
+		{
+			var deleteResult = await UserManager.DeleteAsync(user);
+
+			if (deleteResult.Succeeded)
+			{
+				Snackbar.Add($"Deleted {user.UserName}", Severity.Info);
+				users.Remove(user);
+			}
+			else
+				Snackbar.Add($"Unable to delete {user.UserName}", Severity.Error);
+		}
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		users = UserManager.Users.ToList();
+
+		studentMap = new Dictionary<ApplicationUser, bool>();
+		adminMap = new Dictionary<ApplicationUser, bool>();
+
+		foreach(var user in users)
+		{
+			studentMap.TryAdd(user, await UserManager.IsInRoleAsync(user, Roles.Student));
+			adminMap.TryAdd(user, await UserManager.IsInRoleAsync(user, Roles.Admin));
+		}
+
+		loading = false;
+		await InvokeAsync(StateHasChanged);
+
+		await base.OnInitializedAsync();
+	}
+
+}

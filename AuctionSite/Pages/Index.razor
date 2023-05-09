@@ -153,12 +153,15 @@ else
 		AutoResetEvent? autoEvent = (AutoResetEvent?)stateInfo;
 
 		// update elapsed time for each auction
-		foreach (var auction in Auctions)
-		//for(int i = 0; i < AuctionTimespans.Count; i++)
+		if(Auctions is not null)
 		{
-			AuctionTimespans[auction.Id] = AuctionTimespans[auction.Id].Subtract(TimeSpan.FromSeconds(1));
-			//AuctionTimeRemainings[auction.Id] = GetRemainingTime(AuctionTimespans[auction.Id]);
-			AuctionTimeRemainings[auction.Id] = AuctionTimespans[auction.Id].GetRemainingTime();
+			foreach (var auction in Auctions)
+			//for(int i = 0; i < AuctionTimespans.Count; i++)
+			{
+				AuctionTimespans[auction.Id] = AuctionTimespans[auction.Id].Subtract(TimeSpan.FromSeconds(1));
+				//AuctionTimeRemainings[auction.Id] = GetRemainingTime(AuctionTimespans[auction.Id]);
+				AuctionTimeRemainings[auction.Id] = AuctionTimespans[auction.Id].GetRemainingTime();
+			}			
 		}
 
 		base.TimerTick(stateInfo);

@@ -5,6 +5,7 @@
     <AuthorizeView Roles="@($"{Roles.Admin}")">
         <Authorized>
             <MudNavLink Href="/auction/new">Create a New Auction</MudNavLink>
+            <MudNavLink Href="/users">View Users</MudNavLink>
         </Authorized>
     </AuthorizeView>
 

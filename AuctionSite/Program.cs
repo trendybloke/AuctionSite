@@ -82,16 +82,16 @@ app.MapBlazorHub();
 app.MapHub<BiddingHub>("/BiddingHub");
 app.MapFallbackToPage("/_Host");
 
-using (var scope = app.Services.CreateScope())
-{
-	var services = scope.ServiceProvider;
+//using (var scope = app.Services.CreateScope())
+//{
+//	var services = scope.ServiceProvider;
 
-	RoleManager<IdentityRole> roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-	UserManager<ApplicationUser> userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+//	RoleManager<IdentityRole> roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+//	UserManager<ApplicationUser> userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
 
-	await CreateRolesAsync(roleManager);
-	await CreateInitialUsersAsync(userManager);
-}
+//	await CreateRolesAsync(roleManager);
+//	await CreateInitialUsersAsync(userManager);
+//}
 
 app.Run();
 
