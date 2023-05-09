@@ -3,6 +3,7 @@
 @using AuctionSite.Enums
 @using AuctionSite.Helpers
 @using AuctionSite.Services
+@using AuctionSite.Converters
 @using System.Text
 @using System.Globalization
 @using Microsoft.AspNetCore.SignalR.Client
@@ -37,12 +38,22 @@ else
 				</MudText>
 				<MudText Typo="Typo.h5">Condition: @auction.Condition</MudText>
 				<MudText Typo="Typo.h6">Auction started on @auction.StartDate</MudText>
-				<MudCarousel TData="object">
-					<MudCarouselItem Transition="Transition.Fade" Class="d-flex justify-center align-center" Style="height:500px">
-						@*<MudImage Src="placeholder-image.png" Fluid="true" ObjectFit="ObjectFit.Cover"/>*@
-						<img src="placeholder-image.png" width="500" height="500">
-					</MudCarouselItem>
-				</MudCarousel>
+				@if(auction.ImageIDs.Count == 0)
+				{
+					<img src="placeholder-image.png">
+				}
+				else
+				{
+					<MudPaper Elevation="6" Class="d-flex justify-content-center">
+						<MudCarousel ItemsSource="images" Style="height:480px; width:600px;">
+							<ItemTemplate>
+								<div class="d-flex justify-content-center">
+									<img src="@context.ConvertToBrowserRenderableFile()" style="height:420px; width:500px;"/>
+								</div>
+							</ItemTemplate>
+						</MudCarousel>
+					</MudPaper>
+				}
 				<MudText Typo="Typo.h6">Description</MudText>
 				<MudText Typo="Typo.body1">@auction.Description</MudText>
 				<br/>
@@ -102,6 +113,8 @@ else
 @code {
 	AuctionModel? auction;
 
+	UploadedFile[] images;
+
 	BidModel[]? bids;
 
 	TimeSpan timeTillClosed;
@@ -122,6 +135,8 @@ else
 		await base.OnInitializedAsync();
 
 		auction = await AuctionService.GetAuctionAsync(Id);
+
+		images = await AuctionService.GetAuctionImagesAsync(Id);
 
 		if (auctionOpen)
 		{

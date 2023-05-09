@@ -39,7 +39,8 @@
 	{
 		var user = await UserManager.FindByIdAsync(CurrentUser.GetUserID());
 
-		balance = user.Balance;
+		if(user is not null)
+			balance = user.Balance;
 
 		await InvokeAsync(StateHasChanged);
 	}

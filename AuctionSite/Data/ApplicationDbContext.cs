@@ -16,6 +16,7 @@ namespace AuctionSite.Data
 		public DbSet<BidModel> Bids { get; set; }
 		public DbSet<NotificationModel> Notifications { get; set; }
 		public DbSet<WatchModel> Watching { get; set; }
+		public DbSet<UploadedFile> Images { get; set; }
 
 		protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 		{
@@ -49,7 +50,7 @@ namespace AuctionSite.Data
 				.Property(am => am.ImageIDs)
 				.HasConversion(
 					i => JsonConvert.SerializeObject(i),
-					i => JsonConvert.DeserializeObject<List<string>>(i)
+					i => JsonConvert.DeserializeObject<List<int>>(i)
 				);
 
 			builder.Entity<AuctionModel>()
@@ -69,7 +70,7 @@ namespace AuctionSite.Data
 						StartDate = new DateTime(2023, 1, 1),
 						EndDate = new DateTime(2024, 1, 1),
 						//WatchingUserIDs = new List<string>(),
-						ImageIDs = new List<string>()
+						ImageIDs = new List<int>()
 					},
 					new AuctionModel
 					{
@@ -85,7 +86,7 @@ namespace AuctionSite.Data
 						StartDate = new DateTime(2023, 1, 1),
 						EndDate = new DateTime(2024, 1, 1),
 						//WatchingUserIDs = new List<string>(),
-						ImageIDs = new List<string>()
+						ImageIDs = new List<int>()
 					},
 					new AuctionModel
 					{
@@ -101,7 +102,7 @@ namespace AuctionSite.Data
 						StartDate = new DateTime(2023, 1, 1),
 						EndDate = new DateTime(2024, 1, 1),
 						//WatchingUserIDs = new List<string>(),
-						ImageIDs = new List<string>()
+						ImageIDs = new List<int>()
 					}
 				});
 		}

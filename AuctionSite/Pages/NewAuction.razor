@@ -1,9 +1,12 @@
 ﻿@page "/auction/new"
 @attribute [Authorize(Roles = $"{Roles.Admin}")]
 
+@using AuctionSite.Converters
+
 @inherits PageBase
 
 @inject AuctionService AuctionService
+@inject ImageService ImageService
 
 <MudPaper Elevation="4" Class="pa-4 ma-4">
 	<MudText Typo="Typo.h3">Create New Auction</MudText>
@@ -28,6 +31,35 @@
 							@bind-Value="auction.ReservePrice"
 							Adornment="Adornment.Start"
 							AdornmentText="£"/>
+
+		<MudStack Style="width:100%">
+			<MudFileUpload T="IReadOnlyList<IBrowserFile>" OnFilesChanged="OnInputFileChanged" Hidden="false"
+				Class="flex-1" InputClass="absolute mud-width-full mud-height-full overflow-hidden z-20"
+				InputStyle="opacity:0" @ondragenter="SetDragClass" @ondragleave="ClearDragClass" @ondragend="ClearDragClass">
+				<ButtonTemplate Context="buttoncontext">
+					<MudPaper Outlined="true" Height="300px" Class="@DragClass">
+						<MudText Typo="Typo.h6">Drag and drop images or click here (Max. 10 files)</MudText>
+						@if(images is not null)
+						{
+							<div class="d-flex">
+								@foreach(var image in images)
+								{
+									<MudPaper Elevation="3" Class="flex-none d-flex">
+										<img src="@image.ConvertToBrowserRenderableFile()" style="height:80px; width:80px;"/>
+										<MudText Class="pa-4">@($"{image.Name}")</MudText>
+									</MudPaper>
+									<MudSpacer/>
+								}
+							</div>
+						}
+						else
+						{
+							<MudText>No images uploaded.</MudText>
+						}
+					</MudPaper>
+				</ButtonTemplate>
+			</MudFileUpload>
+		</MudStack>
 
 		<MudSelect Disabled="loading"
 				   Label="Item Condition"
@@ -77,6 +109,11 @@
 
 	AuctionModel auction;
 
+	List<UploadedFile> images;
+
+	static string DefaultDragClass = "relative rounded-lg border-2 border-dashed pa-4 mt-4 mud-width-full mud-height-full z-10";
+	string DragClass = DefaultDragClass;
+
 	// category flags
 	bool completeSys = false;
 	bool incompleteSys = false;
@@ -90,12 +127,36 @@
 
 	int auctionDuration = 3;
 
+	private void SetDragClass()
+	{
+		DragClass = $"{DefaultDragClass} + mud-border-primary";
+	}
+
+	private void ClearDragClass()
+	{
+		DragClass = DefaultDragClass;
+	}
+
+	private async void OnInputFileChanged(InputFileChangeEventArgs e)
+	{
+		var files = e.GetMultipleFiles();
+
+		images = new List<UploadedFile>();
+
+		foreach(var file in files)
+		{
+			images.Add(await file.ConvertToUploadedFileAsync());
+		}
+
+		await InvokeAsync(StateHasChanged);
+	}
+
 	protected override Task OnInitializedAsync()
 	{
 		auction = new AuctionModel()
 		{
 			CreatorUserID = CurrentUser.GetUserID(),
-			ImageIDs = new List<string>()
+			ImageIDs = new List<int>()
 		};
 
 		return base.OnInitializedAsync();
@@ -107,7 +168,22 @@
 
 		await InvokeAsync(StateHasChanged);
 
-		// build auction
+		foreach(var image in images)
+		{
+			// Save images
+			int newid = await ImageService.UploadImageAsync(image);
+
+			if(newid == -1)
+			{
+				Snackbar.Add($"Could not upload {image.Name}", Severity.Error);
+				continue;
+			}
+
+			// Add image IDs to the auction image ID list 
+			auction.ImageIDs.Add(newid);
+		}
+
+		// build rest of auction
 		auction.StartDate = startDate.Value.Add(startTime.Value);
 		auction.EndDate = auction.StartDate.AddDays(auctionDuration);
 

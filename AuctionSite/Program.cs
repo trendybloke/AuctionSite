@@ -42,6 +42,8 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<AuctionService>();
 builder.Services.AddSingleton<BiddingService>();
 builder.Services.AddSingleton<WatchingService>();
+// builder.Services.AddSingleton<NotificationService>();
+builder.Services.AddSingleton<ImageService>();
 
 // MudBlazor
 builder.Services.AddMudServices();

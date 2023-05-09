@@ -1,4 +1,5 @@
 ﻿using AuctionSite.Data;
+//using AuctionSite.Converters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Components;
 
@@ -36,6 +37,30 @@ namespace AuctionSite.Services
 			}
 
 			return auctions;
+		}
+
+		public async Task<UploadedFile[]> GetAuctionImagesAsync(int? id)
+		{
+			List<UploadedFile> auctionImages = new List<UploadedFile>();
+
+			using(var context = await DbContextFactory.CreateDbContextAsync())
+			{
+				var auction = await context.Auctions.FindAsync(id);
+
+				foreach(var imageId in auction.ImageIDs)
+				{
+					var image = await context.Images.FindAsync(imageId);
+
+					auctionImages.Add(image);
+				}
+			}
+
+			return auctionImages.ToArray();
+		}
+
+		public async Task<UploadedFile[]> GetAuctionImagesAsync(AuctionModel auction)
+		{
+			return await GetAuctionImagesAsync(auction.Id);
 		}
 
 		public async Task<AuctionModel[]> GetAuctionsByAdminAsync(string adminUserId)

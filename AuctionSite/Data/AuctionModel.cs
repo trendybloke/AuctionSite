@@ -1,6 +1,7 @@
 ﻿using AuctionSite.Enums;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AuctionSite.Data
 {
@@ -26,6 +27,9 @@ namespace AuctionSite.Data
 		public DateTime StartDate { get; set; }
 		public DateTime EndDate { get; set; }
 
-		public List<string> ImageIDs { get; set; }
+		public List<int> ImageIDs { get; set; }
+
+		//[NotMapped]
+		//public List<UploadedFile> Images { get; set; }
 	}
 }

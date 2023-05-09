@@ -2,12 +2,14 @@
 @inherits RealTimePage
 
 @inject AuctionService AuctionService
+@inject ImageService ImageService
 @inject BiddingService BiddingService
 @inject WatchingService WatchingService
 
 @using AuctionSite.Enums
 @using AuctionSite.Helpers
 @using AuctionSite.Services
+@using AuctionSite.Converters
 @using System.Text
 @using System.Globalization
 @using Microsoft.AspNetCore.SignalR.Client;
@@ -28,7 +30,18 @@ else
 	<MudCarousel Class="mud-width-full" Style="height: 500px" ItemsSource="@RecentAuctions">
 		<ItemTemplate>
 			<div class="d-flex" style="height:100%; padding-top:15px;">
-				<MudImage Src="placeholder-image.png"/>
+				@if(ImageService.GetPrimaryImage(context) is null)
+				{
+					<MudImage Src="placeholder-image.png"/>
+				}
+				else
+				{
+					<MudPaper Style="height:100%; width:50%; margin-bottom:10px; margin-left:10px;">
+						<MudImage Src="@(ImageService.GetPrimaryImage(context).ConvertToBrowserRenderableFile())" 
+						Class="justify-content-center pa-8"
+						Style="height:95%; width:95%;"/>
+					</MudPaper>
+				}
 				<div>
 					@*<MudText Typo="Typo.h4">@context.Title</MudText>*@
 					<MudLink Href="@($"/auction/{context.Id}")" Typo="Typo.h4">@context.Title</MudLink>
@@ -51,15 +64,30 @@ else
 	</MudCarousel>
 
 	<MudText Typo="Typo.h4">Brand new items</MudText>
-	<div class="d-inline-flex pa-2" style="width: 100vw;">
+	<div class="d-inline-flex justify-content-left" style="width: 80vw;">
 	@foreach(var auction in NewAuctions)
 	{
-			<MudCard Style="width: 30%">
+			<MudCard Style="width:25%; max-width:250%;">
 				<MudCardHeader>
 					<MudText Typo="Typo.h5">@auction.Title</MudText>
 				</MudCardHeader>
-				<MudCardMedia Image="placeholder-image.png" Height="200"/>
+@*				@if(ImageService.GetPrimaryImage(auction) is null)
+				{
+					<MudCardMedia Image="placeholder-image.png" Height="200"/>
+				}
+				else
+				{
+					<MudCardMedia Image="ImageService.GetPrimaryImage(auction).ConvertToBrowserReadableFile()" Height="200"/>
+				}*@
 				<MudCardContent>
+					@if (ImageService.GetPrimaryImage(auction) is null)
+					{
+						<MudImage Src="placeholder-image.png" Width="200"/>
+					}
+					else
+					{
+						<MudImage Src="@(ImageService.GetPrimaryImage(auction).ConvertToBrowserRenderableFile())" Class="d-flex justify-content-center"/>
+					}
 					<MudText Typo="Typo.h6">In @auction.Category.ToFormattedString()</MudText>
 					<MudText Typo="Typo.h5">Closes in @AuctionTimeRemainings[auction.Id] </MudText>
 					<MudText Typo="Typo.h6">@($"Starting price: {auction.StartPrice.ToString("C", CultureInfo.CurrentCulture)}")</MudText>
