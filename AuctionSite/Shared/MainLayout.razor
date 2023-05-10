@@ -48,7 +48,8 @@
 
     void ToggleSide() => sideOpen = !sideOpen;
 
-    private HubConnection? hubConnection;
+    private HubConnection? bidHubConnection;
+    private HubConnection? auctionHubConnection;
 
     private NotificationDisplay notifDisplay;
 
@@ -76,9 +77,13 @@
     {
         await base.OnInitializedAsync();
 
-        hubConnection = new HubConnectionBuilder()
+        bidHubConnection = new HubConnectionBuilder()
                             .WithUrl(Navigation.ToAbsoluteUri("/BiddingHub"))
                             .Build();
+
+        auctionHubConnection = new HubConnectionBuilder()
+                                    .WithUrl(Navigation.ToAbsoluteUri("/AuctionHub"))
+                                    .Build();
 
         //hubConnection.On<NotificationModel>("NewNotification", async (newNotif) =>
         //{
@@ -89,12 +94,18 @@
         //    await InvokeAsync(StateHasChanged);
         //});
 
-        hubConnection.On("Update-Notifications", async () =>
+        bidHubConnection.On("Update-Notifications", async () =>
         {
             await notifDisplay.PopulateNotifications(CurrentUser.GetUserID());
         });
 
-        await hubConnection.StartAsync();
+        auctionHubConnection.On("Auction-Ended", async () =>
+        {
+            await notifDisplay.PopulateNotifications(CurrentUser.GetUserID());
+        });
+
+        await bidHubConnection.StartAsync();
+        await auctionHubConnection.StartAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

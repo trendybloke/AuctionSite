@@ -39,6 +39,8 @@ builder.Services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuth
 builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, ClaimsPrincipalFactory>();
 builder.Services.AddSignalR();
 
+builder.Services.AddSingleton<AuctionCloserService>();
+
 builder.Services.AddSingleton<AuctionService>();
 builder.Services.AddSingleton<BiddingService>();
 builder.Services.AddSingleton<WatchingService>();
@@ -81,6 +83,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapBlazorHub();
+app.MapHub<AuctionHub>("/AuctionHub");
 app.MapHub<BiddingHub>("/BiddingHub");
 app.MapFallbackToPage("/_Host");
 

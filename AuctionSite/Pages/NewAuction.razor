@@ -168,19 +168,22 @@
 
 		await InvokeAsync(StateHasChanged);
 
-		foreach(var image in images)
+		if(images is not null)
 		{
-			// Save images
-			int newid = await ImageService.UploadImageAsync(image);
-
-			if(newid == -1)
+			foreach(var image in images)
 			{
-				Snackbar.Add($"Could not upload {image.Name}", Severity.Error);
-				continue;
-			}
+				// Save images
+				int newid = await ImageService.UploadImageAsync(image);
 
-			// Add image IDs to the auction image ID list 
-			auction.ImageIDs.Add(newid);
+				if(newid == -1)
+				{
+					Snackbar.Add($"Could not upload {image.Name}", Severity.Error);
+					continue;
+				}
+
+				// Add image IDs to the auction image ID list 
+				auction.ImageIDs.Add(newid);
+			}			
 		}
 
 		// build rest of auction
@@ -195,7 +198,7 @@
 
 		auction.Category = (AuctionCategory)categoryField;
 
-		if(startDate >= DateTime.Now)
+		if(startDate <= DateTime.Now)
 		{
 			auction.State = AuctionState.Open;
 		}

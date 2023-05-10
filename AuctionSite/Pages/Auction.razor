@@ -9,13 +9,14 @@
 @using Microsoft.AspNetCore.SignalR.Client
 
 @inject AuctionService AuctionService
+@inject AuctionCloserService AuctionCloserService
 @inject BiddingService BiddingService
 @inject WatchingService WatchingService
 @inject UserManager<ApplicationUser> UserManager
 
 @inject IDialogService DialogService
 
-@if(auction == null)
+@if(loading)
 {
 	<p><em>Loading...</em></p>
 }
@@ -38,6 +39,10 @@ else
 				</MudText>
 				<MudText Typo="Typo.h5">Condition: @auction.Condition</MudText>
 				<MudText Typo="Typo.h6">Auction started on @auction.StartDate</MudText>
+				@if (!auctionOpen)
+				{
+					<MudText Typo="Typo.h5">Auction closed on @auction.EndDate</MudText>
+				}
 				@if(auction.ImageIDs.Count == 0)
 				{
 					<img src="placeholder-image.png">
@@ -85,10 +90,6 @@ else
 						</div>
 					</AuthorizeView>
 				}
-				else
-				{
-					<MudText Typo="Typo.h5">Auction closed on @timeTillClosed.GetRemainingTime()</MudText>
-				}
 			</MudPaper>
 		</div>
 		<MudSpacer/>
@@ -132,9 +133,13 @@ else
 
 	bool userWatching;
 
+	bool loading = true;
+
 	string auctionStateText => auctionOpen
 								? $"Auction is currently open until {auction.EndDate}"
-								: $"Auction closed on {auction.EndDate}";
+								: "";
+
+	private HubConnection? auctionHubConnection;
 
 	[Parameter]
 	public int? Id { get; set; }
@@ -143,9 +148,9 @@ else
 	{
 		await base.OnInitializedAsync();
 
-		auction = await AuctionService.GetAuctionAsync(Id);
+		loading = true;
 
-		images = await AuctionService.GetAuctionImagesAsync(Id);
+		await PopulatePageData(true);
 
 		userWatching = await WatchingService.GetUserWatchingAuctionAsync(CurrentUser.GetUserID(), Id.Value) != null;
 
@@ -167,9 +172,47 @@ else
 		//	StateHasChanged();
 		//});
 
+		auctionHubConnection = new HubConnectionBuilder()
+									.WithUrl(NavigationManager.ToAbsoluteUri("/BiddingHub"))
+									.Build();
+
+		auctionHubConnection.On("Auction-Ended", async () =>
+		{
+			await PopulatePageData(false);
+			await InvokeAsync(StateHasChanged);
+		});
+
 		await bidHubConnection.StartAsync();
+		await auctionHubConnection.StartAsync();
+
+		AuctionCloserService.OnAuctionEnd += async (sender, e) =>
+		{
+			await PopulatePageData(false);
+			await auctionHubConnection.SendAsync("AuctionEnded");
+		};
+
+		loading = false;
 
 		await InvokeAsync(StateHasChanged);
+	}
+
+	private async Task PopulatePageData(bool firstPopulation)
+	{
+		if (!firstPopulation)
+		{
+			loading = true;
+			await InvokeAsync(StateHasChanged);		
+		}
+
+		auction = await AuctionService.GetAuctionAsync(Id);
+
+		images = await AuctionService.GetAuctionImagesAsync(Id);		
+
+		if (!firstPopulation)
+		{
+			loading = false;
+			await InvokeAsync(StateHasChanged);
+		}
 	}
 
 	protected override void OnAfterRender(bool firstRender)

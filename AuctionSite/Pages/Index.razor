@@ -2,6 +2,7 @@
 @inherits RealTimePage
 
 @inject AuctionService AuctionService
+@inject AuctionCloserService AuctionCloserService
 @inject ImageService ImageService
 @inject BiddingService BiddingService
 @inject WatchingService WatchingService
@@ -46,7 +47,10 @@ else
 					@*<MudText Typo="Typo.h4">@context.Title</MudText>*@
 					<MudLink Href="@($"/auction/{context.Id}")" Typo="Typo.h4">@context.Title</MudLink>
 					<MudText Typo="Typo.h5">In @context.Category.ToFormattedString()</MudText>
-					<MudText Typo="Typo.h5">@AuctionTimeRemainings[context.Id]</MudText>
+					@if(!refreshing)
+					{
+						<MudText Typo="Typo.h5">@AuctionTimeRemainings[context.Id]</MudText>
+					}
 					<MudText Typo="Typo.h6">@($"Starting price: {context.StartPrice.ToString("C", CultureInfo.CurrentCulture)}")</MudText>
 					@*<MudText Typo="Typo.h6">@($"Current price: {BiddingService.GetHighestBidAsync(context).Result.Amount}")</MudText>*@
 						<MudText Typo="Typo.h6">
@@ -89,7 +93,10 @@ else
 						<MudImage Src="@(ImageService.GetPrimaryImage(auction).ConvertToBrowserRenderableFile())" Class="d-flex justify-content-center"/>
 					}
 					<MudText Typo="Typo.h6">In @auction.Category.ToFormattedString()</MudText>
-					<MudText Typo="Typo.h5">Closes in @AuctionTimeRemainings[auction.Id] </MudText>
+					@if (!refreshing)
+					{
+						<MudText Typo="Typo.h5">Closes in @AuctionTimeRemainings[auction.Id] </MudText>					
+					}
 					<MudText Typo="Typo.h6">@($"Starting price: {auction.StartPrice.ToString("C", CultureInfo.CurrentCulture)}")</MudText>
 					<MudText Typo="Typo.h6">
 						@(
@@ -114,7 +121,7 @@ else
 						<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => BidPopover.Enable(auction, CurrentUser.GetUserID()))">Bid</MudButton>
 					</AuthorizeView>*@
 
-					@if (CurrentUser.IsStudent())
+					@if (CurrentUser.IsStudent() && !refreshing)
 					{
 						@if (userWatching[auction.Id])
 						{
@@ -142,10 +149,13 @@ else
 	Dictionary<int, string> AuctionTimeRemainings;
 	Dictionary<int, bool> userWatching;
 
+	bool refreshing = false;
+
 	AuctionModel[]? RecentAuctions;
 	AuctionModel[]? NewAuctions;
 
 	//private HubConnection? bidHubConnection;
+	private HubConnection? auctionHubConnection;
 
 	int selectedCarouselItem;
 
@@ -153,15 +163,55 @@ else
 	{
 		await base.OnInitializedAsync();
 
+		await PopulateAuctions();
 
+		// Init. hub connections
+		bidHubConnection = new HubConnectionBuilder()
+									.WithUrl(NavigationManager.ToAbsoluteUri("/BiddingHub"))
+									.Build();
+
+		auctionHubConnection = new HubConnectionBuilder()
+									.WithUrl(NavigationManager.ToAbsoluteUri("/AuctionHub"))
+									.Build();
+
+		// Update-Bids
+		bidHubConnection.On("Update-Bids", async () =>
+		{
+			await InvokeAsync(StateHasChanged);
+		});
+
+		// Auction-Ended
+		auctionHubConnection.On("Auction-Ended", async () =>
+		{
+			await PopulateAuctions();
+			await InvokeAsync(StateHasChanged);
+		});
+
+		await bidHubConnection.StartAsync();
+		await auctionHubConnection.StartAsync();
+
+		// AuctionCloserService onclose
+		AuctionCloserService.OnAuctionEnd += async (sender, e) => {
+			await PopulateAuctions();
+			await auctionHubConnection.SendAsync("AuctionEnded");
+		};
+
+		await InvokeAsync(StateHasChanged);
+	}
+
+	async Task PopulateAuctions()
+	{
+		refreshing = true;
 		Auctions = await AuctionService.GetAuctionsAsync();
 
 		RecentAuctions = Auctions
+						.Where(a => a.State == AuctionState.Open)
 						.OrderByDescending(a => a.StartDate)
 						.Take(5).
 						ToArray();
 
 		NewAuctions = RecentAuctions
+						.Where(a => a.State == AuctionState.Open)
 						.Where(a => a.Condition == ItemCondition.New)
 						.Take(5)
 						.ToArray();
@@ -172,11 +222,14 @@ else
 		{
 			var watchedAuctions = WatchingService.GetWatchedAuctions(CurrentUser.GetUserID());
 
-			foreach(var auction in Auctions)
+			foreach (var auction in Auctions)
 			{
 				var userIsWatching = watchedAuctions.Where(wa => wa.Id == auction.Id).FirstOrDefault() != null;
 
-				userWatching.TryAdd(auction.Id, userIsWatching);
+				var existed = !userWatching.TryAdd(auction.Id, userIsWatching);
+
+				if (existed)
+					userWatching[auction.Id] = userIsWatching;
 			}
 		}
 
@@ -184,27 +237,13 @@ else
 		AuctionTimespans = new Dictionary<int, TimeSpan>();
 		AuctionTimeRemainings = new Dictionary<int, string>();
 
-		foreach(var auction in Auctions)
+		foreach (var auction in Auctions)
 		{
 			AuctionTimespans.Add(auction.Id, auction.EndDate - DateTime.Now);
 			//AuctionTimeRemainings.Add(auction.Id, GetRemainingTime(AuctionTimespans[auction.Id]));
 			AuctionTimeRemainings.Add(auction.Id, AuctionTimespans[auction.Id].GetRemainingTime());
 		}
-
-		// Init. hub connection
-		bidHubConnection = new HubConnectionBuilder()
-									.WithUrl(NavigationManager.ToAbsoluteUri("/BiddingHub"))
-									.Build();
-
-		// Update-Bids
-		bidHubConnection.On("Update-Bids", async () =>
-		{
-			await InvokeAsync(StateHasChanged);
-		});
-
-		await bidHubConnection.StartAsync();
-
-		await InvokeAsync(StateHasChanged);
+		refreshing = false;
 	}
 
 	protected override void OnAfterRender(bool firstRender)
@@ -218,7 +257,7 @@ else
 		AutoResetEvent? autoEvent = (AutoResetEvent?)stateInfo;
 
 		// update elapsed time for each auction
-		if(Auctions is not null)
+		if(Auctions is not null && AuctionTimespans is not null)
 		{
 			foreach (var auction in Auctions)
 			//for(int i = 0; i < AuctionTimespans.Count; i++)
