@@ -73,6 +73,27 @@ namespace AuctionSite.Services
 			return userids.ToArray();
 		}
 
+		public AuctionModel[] GetWatchedAuctions(string userid)
+		{
+			List<AuctionModel> watchedAuctions = new List<AuctionModel>();
+
+			using (var context = DbContextFactory.CreateDbContext())
+			{
+				WatchModel[] watchModels;
+
+				watchModels = context.Watching.Where(w => w.WatchingUserID == userid).ToArray();
+
+				foreach (var watchModel in watchModels)
+				{
+					var watchedAuction = context.Auctions.Find(watchModel.AuctionID);
+
+					watchedAuctions.Add(watchedAuction);
+				}
+			}
+
+			return watchedAuctions.ToArray();
+		}
+
 		public async Task<AuctionModel[]> GetWatchedAuctionsAsync(string userid)
 		{
 			List<AuctionModel> watchedAuctions = new List<AuctionModel>();
@@ -93,5 +114,19 @@ namespace AuctionSite.Services
 
 			return watchedAuctions.ToArray();
 		}
+
+		public async Task<WatchModel?> GetUserWatchingAuctionAsync(string userId, int auctionId)
+		{
+			WatchModel? watchModel = null;
+
+			using (var context = await DbContextFactory.CreateDbContextAsync())
+			{
+				watchModel = await context.Watching
+											.Where(w => w.WatchingUserID == userId && w.AuctionID == auctionId)
+											.FirstOrDefaultAsync();
+			}
+
+			return watchModel;
+		} 
 	}
 }

@@ -74,7 +74,14 @@ else
 					<AuthorizeView Roles="@($"{Roles.Student}")">
 						<div class="justify-content-center align-center">
 							<MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@(() => OnBid())" Disabled="@(!auctionOpen)">Bid</MudButton>
-							<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => OnWatch())" Disabled="@(!auctionOpen)">Watch</MudButton>
+							@if(userWatching)
+							{
+								<MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@(() => OnUnWatch())" Disabled="@(!auctionOpen)">Unwatch</MudButton>
+							}
+							else
+							{
+								<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => OnWatch())" Disabled="@(!auctionOpen)">Watch</MudButton>
+							}
 						</div>
 					</AuthorizeView>
 				}
@@ -123,6 +130,8 @@ else
 
 	bool auctionOpen => auction.State == AuctionState.Open;
 
+	bool userWatching;
+
 	string auctionStateText => auctionOpen
 								? $"Auction is currently open until {auction.EndDate}"
 								: $"Auction closed on {auction.EndDate}";
@@ -137,6 +146,8 @@ else
 		auction = await AuctionService.GetAuctionAsync(Id);
 
 		images = await AuctionService.GetAuctionImagesAsync(Id);
+
+		userWatching = await WatchingService.GetUserWatchingAuctionAsync(CurrentUser.GetUserID(), Id.Value) != null;
 
 		if (auctionOpen)
 		{
@@ -211,12 +222,32 @@ else
 		if (watchResult)
 		{
 			Snackbar.Add($"Now watching {auction.Title}", Severity.Info);
+			userWatching = true;
 		}
 		else
 		{
-			Snackbar.Add($"Couldn't watch / unwatch {auction.Title} because Josh needs to put that in!", Severity.Error);
+			Snackbar.Add($"Failed to watch {auction.Title}", Severity.Error);
 		}
+	}
 
+	async void OnUnWatch()
+	{
+		WatchModel? watchModel = await WatchingService.GetUserWatchingAuctionAsync(CurrentUser.GetUserID(), Id.Value);
+
+		if(watchModel is null)
+			return;
+
+		var unWatchResult = await WatchingService.StopWatchingAuctionAsync(watchModel);
+
+		if (unWatchResult)
+		{
+			Snackbar.Add($"Stopped watching {auction.Title}", Severity.Warning);
+			userWatching = false;
+		}
+		else
+		{
+			Snackbar.Add($"Failed to unwatch {auction.Title}", Severity.Error);
+		}
 	}
 
 	async void OnEdit()

@@ -102,10 +102,31 @@ else
 				</MudCardContent>
 				<MudCardActions>
 					<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => ViewAuction(auction))">View</MudButton>
-					<AuthorizeView Roles="@($"{Roles.Student}")">
-						<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => WatchAuction(auction))">Watch</MudButton>
+					@*<AuthorizeView Roles="@($"{Roles.Student}")">
+						@if (userWatching[auction])
+						{
+							<MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="@(() => UnWatchAuction(auction))">UnWatch</MudButton>
+						}
+						else if(!userWatching[auction])
+						{
+							<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => WatchAuction(auction))">Watch</MudButton>						
+						}
 						<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => BidPopover.Enable(auction, CurrentUser.GetUserID()))">Bid</MudButton>
-					</AuthorizeView>
+					</AuthorizeView>*@
+
+					@if (CurrentUser.IsStudent())
+					{
+						@if (userWatching[auction.Id])
+						{
+							<MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="@(() => UnWatchAuction(auction))">UnWatch</MudButton>
+						}
+						else
+						{
+							<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => WatchAuction(auction))">Watch</MudButton>
+						}
+						<MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => BidPopover.Enable(auction, CurrentUser.GetUserID()))">Bid</MudButton>
+					}
+
 				</MudCardActions>
 			</MudCard>			
 	}
@@ -119,6 +140,7 @@ else
 	AuctionModel[]? Auctions;
 	Dictionary<int, TimeSpan> AuctionTimespans;
 	Dictionary<int, string> AuctionTimeRemainings;
+	Dictionary<int, bool> userWatching;
 
 	AuctionModel[]? RecentAuctions;
 	AuctionModel[]? NewAuctions;
@@ -143,6 +165,20 @@ else
 						.Where(a => a.Condition == ItemCondition.New)
 						.Take(5)
 						.ToArray();
+
+		userWatching = new Dictionary<int, bool>();
+
+		if (CurrentUser.IsStudent())
+		{
+			var watchedAuctions = WatchingService.GetWatchedAuctions(CurrentUser.GetUserID());
+
+			foreach(var auction in Auctions)
+			{
+				var userIsWatching = watchedAuctions.Where(wa => wa.Id == auction.Id).FirstOrDefault() != null;
+
+				userWatching.TryAdd(auction.Id, userIsWatching);
+			}
+		}
 
 		// AuctionTimespans initialization
 		AuctionTimespans = new Dictionary<int, TimeSpan>();
@@ -208,13 +244,37 @@ else
 
 		if (watchResult)
 		{
-			Snackbar.Add($"Watching {auction.Title}", Severity.Success);		
+			Snackbar.Add($"Watching {auction.Title}", Severity.Success);
+			userWatching[auction.Id] = true;
 		}
 		else
 		{
 			Snackbar.Add($"Failed to watch {auction.Title}", Severity.Error);
 		}
 
+		await InvokeAsync(StateHasChanged);
+	}
+
+	private async void UnWatchAuction(AuctionModel auction)
+	{
+		WatchModel? watchModel = await WatchingService.GetUserWatchingAuctionAsync(CurrentUser.GetUserID(), auction.Id);
+
+		if (watchModel is null)
+			return;
+
+		var unwatchResult = await WatchingService.StopWatchingAuctionAsync(watchModel);
+
+		if (unwatchResult)
+		{
+			Snackbar.Add($"Stopped watching {auction.Title}", Severity.Warning);
+			userWatching[auction.Id] = false;
+		}
+		else
+		{
+			Snackbar.Add($"Failed to unwatch {auction.Title}", Severity.Error);
+		}
+
+		await InvokeAsync(StateHasChanged);
 	}
 
 	private void ViewAuction(AuctionModel auction)
