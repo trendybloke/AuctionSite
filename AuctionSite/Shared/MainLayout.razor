@@ -76,19 +76,25 @@
     {
         await base.OnInitializedAsync();
 
-
         hubConnection = new HubConnectionBuilder()
                             .WithUrl(Navigation.ToAbsoluteUri("/BiddingHub"))
                             .Build();
 
-        hubConnection.On<NotificationModel>("NewNotification", (newNotif) =>
+        //hubConnection.On<NotificationModel>("NewNotification", async (newNotif) =>
+        //{
+        //    Snackbar.Add(newNotif.Content, newNotif.Severity);
+
+        //    await notifDisplay.PopulateNotifications(CurrentUser.GetUserID());
+
+        //    await InvokeAsync(StateHasChanged);
+        //});
+
+        hubConnection.On("Update-Notifications", async () =>
         {
-            Snackbar.Add(newNotif.Content, newNotif.Severity);
-
-            notifDisplay.PopulateNotifications(CurrentUser.GetUserID());
-
-            InvokeAsync(StateHasChanged);
+            await notifDisplay.PopulateNotifications(CurrentUser.GetUserID());
         });
+
+        await hubConnection.StartAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

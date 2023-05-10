@@ -3,6 +3,7 @@ using AuctionSite.Data;
 using AuctionSite.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR;
+using System.Security.Claims;
 
 namespace AuctionSite.Hubs
 {
@@ -11,7 +12,8 @@ namespace AuctionSite.Hubs
 	///		Signals sent: 
 	///			- Update-Bids
 	///				Occurs when someone has placed a bid. Should tell any page reliant on bids that they should refresh their collections.
-	/// 
+	///			- NewNotification
+	///				Sent to a user that is watching an auction when a new bid is placed on it
 	/// </summary>
 	public class BiddingHub : Hub
 	{
@@ -24,10 +26,11 @@ namespace AuctionSite.Hubs
 		[Inject]
 		public NotificationService NotificationService { get; set; }
 
-		public BiddingHub(BiddingService biddingService, WatchingService watchingService)
+		public BiddingHub(BiddingService biddingService, WatchingService watchingService, NotificationService notifService)
 		{
 			BiddingService = biddingService;
 			WatchingService = watchingService;
+			NotificationService = notifService;
 		}
 
 		public async Task BidPlaced(BidModel bid)
@@ -40,8 +43,11 @@ namespace AuctionSite.Hubs
 			string[] watchingUserIds = await WatchingService.GetUsersWatchingAuctionAsync(biddedAuction);
 
 			//foreach(string userid in biddedAuction.WatchingUserIDs)
-			foreach(string userid in watchingUserIds)		// Possible refactor?
+			foreach(string userid in watchingUserIds)
 			{
+				if (userid == bid.UserID)
+					continue;
+
 				// Notify user
 				NotificationModel newNotif = new NotificationModel()
 				{
@@ -51,11 +57,14 @@ namespace AuctionSite.Hubs
 					RedirectURL = $"/auction/{biddedAuction.Id}"
 				};
 
-				await Clients.User(userid).SendAsync("NewNotification", newNotif);
-				
+				//await Clients.User(userid).SendAsync("NewNotification");
 				await NotificationService.PersistNotificationAsync(newNotif);
-			}
 
+				// !!! Specific user sendasyncs are bugged !!!
+				//await Clients.User(userid).SendAsync("NewNotification", newNotif);
+				//await Clients.User(userid).SendAsync("Update-Notifications");
+			}
+			await Clients.All.SendAsync("Update-Notifications");
 			await Clients.All.SendAsync("Update-Bids");
 		}
 

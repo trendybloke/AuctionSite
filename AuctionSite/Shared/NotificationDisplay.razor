@@ -1,5 +1,11 @@
 ﻿@using AuctionSite.Data
+@using AuctionSite.Helpers
 @using Microsoft.EntityFrameworkCore;
+@using Microsoft.AspNetCore.SignalR.Client
+@using System.Security.Claims;
+
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
 
 @if (Enabled)
 {
@@ -30,34 +36,9 @@
 	bool notifsOpen = false;
 
 	[Inject]
-	NavigationManager NavigationManager { get; set; }
-
-	[Inject]
 	IDbContextFactory<ApplicationDbContext>? DbContextFactory { get; set; }
 
 	List<NotificationModel> Notifications;
-
-	//List<NotificationModel> Notifications = new List<NotificationModel>()
-	//{
-	//	new NotificationModel()
-	//	{
-	//		Content = "Notification for Test Auction A",
-	//		RedirectURL = "/auction/1",
-	//		Severity = Severity.Normal
-	//	},
-	//	new NotificationModel()
-	//	{
-	//		Content = "Notification for Test Auction B",
-	//		RedirectURL = "/auction/2",
-	//		Severity = Severity.Info
-	//	},
-	//	new NotificationModel()
-	//	{
-	//		Content = "Notification for Test Auction C",
-	//		RedirectURL = "/auction/3",
-	//		Severity = Severity.Error
-	//	},
-	//};
 
 	public void OnNotificationClick(NotificationModel notif)
 	{
@@ -74,7 +55,7 @@
 		NavigationManager.NavigateTo(notif.RedirectURL);
 	}
 
-	public void PopulateNotifications(string userid)
+	public async Task PopulateNotifications(string userid)
 	{
 		using(var context = DbContextFactory.CreateDbContext())
 		{
@@ -83,7 +64,12 @@
 										.ToList();
 		}
 
-		InvokeAsync(StateHasChanged);
+		if (Notifications.Count() > 0)
+		{
+			Snackbar.Add($"{Notifications.Count()} new notification(s)", Severity.Info);
+		}
+
+		await InvokeAsync(StateHasChanged);
 	}
 
 	public void SetEnabled(bool state)

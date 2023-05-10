@@ -161,10 +161,9 @@ else
 									.Build();
 
 		// Update-Bids
-		bidHubConnection.On("Update-Bids", () =>
+		bidHubConnection.On("Update-Bids", async () =>
 		{
-			Snackbar.Add("Update-Bids received", Severity.Info);
-			StateHasChanged();
+			await InvokeAsync(StateHasChanged);
 		});
 
 		await bidHubConnection.StartAsync();

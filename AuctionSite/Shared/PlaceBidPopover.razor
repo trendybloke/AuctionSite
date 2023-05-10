@@ -1,7 +1,10 @@
 ﻿@using AuctionSite.Services
+@using AuctionSite.Hubs
+@using Microsoft.AspNetCore.SignalR.Client
 
 @inject BiddingService biddingService
 @inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 
 <MudOverlay @bind-Visible="Enabled" DarkBackground="true">
@@ -18,7 +21,7 @@
 		}
 		<MudNumericField T="float" @bind-Value="Amount" Min="@StartPrice" Adornment="Adornment.Start" AdornmentText="£"/>
 		<MudButton OnClick="@OnSubmit" Disabled="@showLoading">Bid</MudButton>
-		<MudButton OnClick="@(() => Enabled = false)" Disabled="@showLoading">Cancel</MudButton>
+		<MudButton OnClick="@Disable" Disabled="@showLoading">Cancel</MudButton>
 
 		@if (showLoading)
 		{
@@ -40,6 +43,8 @@
 	public float Amount;
 
 	public string ErrorAlert = "";
+
+	private HubConnection bidHubConnection;
 
 	public event EventHandler<BidModel> OnBidSubmit;
 
@@ -104,6 +109,8 @@
 
 		await UserManager.UpdateAsync(user);
 
+		await bidHubConnection.InvokeAsync("BidPlaced", newBid);
+
 		// return through OnBidSubmit 
 		// -- Make sure no listeners try to do use the service --
 		if(OnBidSubmit is not null)
@@ -111,13 +118,10 @@
 			OnBidSubmit.Invoke(this, newBid);		
 		}
 
-		// close overlay
-		Enabled = false;
-		showLoading = false;
-
 		Snackbar.Add($"{Amount.ToString("C", System.Globalization.CultureInfo.CurrentCulture)} bid has been placed on {Auction.Title}", Severity.Success);
 
-		StateHasChanged();
+		// close overlay
+		await Disable();
 	}
 
 	public async void Enable(AuctionModel auction, string userID)
@@ -128,6 +132,14 @@
 
 		Auction = auction;
 		UserID = userID;
+
+		bidHubConnection = new HubConnectionBuilder()
+								.WithUrl(NavigationManager
+								.ToAbsoluteUri("/BiddingHub"))
+								.Build();
+
+		await bidHubConnection.StartAsync();
+
 
 		//StartPrice = startPrice;
 		//Amount = startPrice + 1;
@@ -150,5 +162,15 @@
 
 		showLoading = false;
 		await InvokeAsync(StateHasChanged);
+	}
+
+	public async Task Disable()
+	{
+		Enabled = false;
+		showLoading = false;
+
+		await bidHubConnection.DisposeAsync();
+
+		StateHasChanged();
 	}
 }
