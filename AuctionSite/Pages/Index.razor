@@ -31,14 +31,14 @@ else
 	<MudCarousel Class="mud-width-full" Style="height: 500px" ItemsSource="@RecentAuctions">
 		<ItemTemplate>
 			<div class="d-flex" style="height:100%; padding-top:15px;">
-				@if(ImageService.GetPrimaryImage(context) is null)
+				@if(AuctionThumbnails[context.Id] is null)
 				{
 					<MudImage Src="placeholder-image.png"/>
 				}
 				else
 				{
 					<MudPaper Style="height:100%; width:50%; margin-bottom:10px; margin-left:10px;">
-						<MudImage Src="@(ImageService.GetPrimaryImage(context).ConvertToBrowserRenderableFile())" 
+						<MudImage Src="@(AuctionThumbnails[context.Id].ConvertToBrowserRenderableFile())" 
 						Class="justify-content-center pa-8"
 						Style="height:95%; width:95%;"/>
 					</MudPaper>
@@ -55,9 +55,9 @@ else
 					@*<MudText Typo="Typo.h6">@($"Current price: {BiddingService.GetHighestBidAsync(context).Result.Amount}")</MudText>*@
 						<MudText Typo="Typo.h6">
 							@(
-								BiddingService.GetHighestBid(context) is null ? 
+								AuctionHighestBid[context.Id] == 0f? 
 								"" : 
-								$"Current price: {BiddingService.GetHighestBid(context).Amount.ToString("C", CultureInfo.CurrentCulture)}"
+								$"Current price: {AuctionHighestBid[context.Id].ToString("C", CultureInfo.CurrentCulture)}"
 							)
 						</MudText>
 					<MudText Typo="Typo.h6">@($"Condition: {context.Condition}")</MudText>
@@ -84,13 +84,13 @@ else
 					<MudCardMedia Image="ImageService.GetPrimaryImage(auction).ConvertToBrowserReadableFile()" Height="200"/>
 				}*@
 				<MudCardContent>
-					@if (ImageService.GetPrimaryImage(auction) is null)
+					@if (AuctionThumbnails[auction.Id] is null)
 					{
 						<MudImage Src="placeholder-image.png" Width="200"/>
 					}
 					else
 					{
-						<MudImage Src="@(ImageService.GetPrimaryImage(auction).ConvertToBrowserRenderableFile())" Class="d-flex justify-content-center"/>
+						<MudImage Src="@(AuctionThumbnails[auction.Id].ConvertToBrowserRenderableFile())" Class="d-flex justify-content-center"/>
 					}
 					<MudText Typo="Typo.h6">In @auction.Category.ToFormattedString()</MudText>
 					@if (!refreshing)
@@ -100,9 +100,9 @@ else
 					<MudText Typo="Typo.h6">@($"Starting price: {auction.StartPrice.ToString("C", CultureInfo.CurrentCulture)}")</MudText>
 					<MudText Typo="Typo.h6">
 						@(
-							BiddingService.GetHighestBid(auction) is null ?
+							AuctionHighestBid[auction.Id] == 0f?
 							"" :
-							$"Current price: {BiddingService.GetHighestBid(auction).Amount.ToString("C", CultureInfo.CurrentCulture)}"
+							$"Current price: {AuctionHighestBid[auction.Id].ToString("C", CultureInfo.CurrentCulture)}"
 						)
 					</MudText>
 					@*<MudText>@auction.Description</MudText>*@
@@ -146,7 +146,9 @@ else
 
 	AuctionModel[]? Auctions;
 	Dictionary<int, TimeSpan> AuctionTimespans;
+	Dictionary<int, UploadedFile?> AuctionThumbnails;
 	Dictionary<int, string> AuctionTimeRemainings;
+	Dictionary<int, float> AuctionHighestBid;
 	Dictionary<int, bool> userWatching;
 
 	bool refreshing = false;
@@ -163,7 +165,8 @@ else
 	{
 		await base.OnInitializedAsync();
 
-		await PopulateAuctions();
+		if (Auctions is null)
+			await PopulateAuctions();
 
 		// Init. hub connections
 		bidHubConnection = new HubConnectionBuilder()
@@ -216,6 +219,29 @@ else
 						.Take(5)
 						.ToArray();
 
+		// Highest bids
+		AuctionHighestBid = new Dictionary<int, float>();
+
+		foreach(var auction in Auctions)
+		{
+			var highestBid = BiddingService.GetHighestBid(auction);
+
+			if (highestBid is not null)
+				AuctionHighestBid.TryAdd(auction.Id, BiddingService.GetHighestBid(auction).Amount);
+			else
+				AuctionHighestBid.TryAdd(auction.Id, 0f);
+		}
+
+
+		// Refresh image thumbnails
+		AuctionThumbnails = new Dictionary<int, UploadedFile?>();
+
+		foreach(var auction in Auctions)
+		{
+			AuctionThumbnails.TryAdd(auction.Id, ImageService.GetPrimaryImage(auction));
+		}
+
+		// Refresh list of watching users
 		userWatching = new Dictionary<int, bool>();
 
 		if (CurrentUser.IsStudent())
